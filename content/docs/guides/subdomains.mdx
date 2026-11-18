@@ -1,0 +1,96 @@
+---
+title: Send from a subdomain
+description: Add the DNS records of a subdomain, such as mail.acme.com, at your DNS host without the common mistakes.
+---
+
+You can send from a subdomain, for example `mail.acme.com`, and keep the root domain for other mail. The records are the same as for any domain. See [Domains and DNS](/docs/guides/domains).
+
+## The records
+
+For the domain `mail.acme.com`, the console shows these records:
+
+| Type | Full name | Value | Required |
+|---|---|---|---|
+| TXT | `1billion._domainkey.mail.acme.com` | The DKIM public key (use the type and value that the console shows) | yes |
+| CNAME | `1billion.mail.acme.com` | Our return path, which the console shows. It holds our SPF and MX. | yes |
+| TXT | `_dmarc.mail.acme.com` | For example `v=DMARC1; p=none; rua=mailto:dmarc@mail.acme.com` | no |
+
+If the subdomain has no DMARC record of its own, the console uses the DMARC of the parent domain (`_dmarc.acme.com`). A subdomain inherits that policy, and the `sp=` tag of the parent applies.
+
+## Type the relative name
+
+At most DNS hosts, the Name (or Host) field is relative to the zone. The host adds the zone after the name. If you type the full name, the host adds the zone again, and you get `1billion._domainkey.mail.acme.com.acme.com`.
+
+For `mail.acme.com` in the zone `acme.com`, type these names:
+
+| Full name | What to type in the Name field |
+|---|---|
+| `1billion._domainkey.mail.acme.com` | `1billion._domainkey.mail` |
+| `1billion.mail.acme.com` | `1billion.mail` |
+| `_dmarc.mail.acme.com` | `_dmarc.mail` |
+
+## One-click setup
+
+The console can add the records for you:
+
+- **Cloudflare**: paste an API token one time. We do not keep the token. The records are DNS only, with no proxy.
+- **Amazon Route 53**: create a role in your AWS account with a CloudFormation stack. We assume the role with an external ID. You do not give us an access key.
+
+You can also download a zone file (BIND format). It has absolute names, with a dot at the end, so the import does not double the names.
+
+## Cloudflare
+
+1. Use one-click setup in the console. Or, to add the records manually, go to **DNS › Records › Add record**.
+2. Type the relative name, for example `1billion.mail`. Cloudflare also accepts the full name and removes the zone part.
+3. Set the CNAME to **DNS only** (grey cloud). Never proxy it.
+4. To import the zone file, go to **DNS › Records › Import and Export › Import**.
+
+## Amazon Route 53
+
+1. Use one-click setup in the console. Or go to **Hosted zones ›** your zone **› Create record**.
+2. The **Record name** field is the prefix. Route 53 shows the zone after it. Type `1billion.mail`, not the full name.
+3. Put a TXT value in quotes, for example `"v=DMARC1; p=none;"`.
+4. To import the zone file, go to **Hosted zones ›** your zone **› Import zone file**.
+
+## GoDaddy
+
+1. Go to your domain **› DNS › Add New Record**.
+2. The **Name** (or **Host**) field is relative. GoDaddy adds the domain itself. Type `1billion.mail`.
+3. Use `@` only for the root domain, never for a subdomain record.
+
+## Squarespace Domains
+
+1. Go to **Domains ›** your domain **› DNS › Custom records › Add record**.
+2. The **Host** field is relative. Type `1billion.mail`.
+
+## Other DNS hosts
+
+Namecheap, Hostinger, Registro.br, Google Cloud DNS and other hosts use the same pattern:
+
+1. Type the relative name in the Host or Name field.
+2. Or import the zone file. Look for "import zone" or "BIND" in the DNS settings.
+
+## Receive replies at the subdomain
+
+This step is optional. To send, the subdomain does not need an inbox. To receive mail at, for example, `feedback@mail.acme.com`, the subdomain needs an MX record of its own. A catch-all address of the parent domain does not cover a subdomain.
+
+With Cloudflare Email Routing:
+
+1. Go to **Email › Email Routing › Settings › Subdomains**, and add the subdomain. Cloudflare adds the MX records (`route1`, `route2` and `route3.mx.cloudflare.net`) and an SPF TXT record.
+2. Add a routing rule for that subdomain.
+
+Our return path (`1billion.<subdomain>`) has its own MX. These changes do not affect it.
+
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| The name has the zone two times (`...acme.com.acme.com`) | Type the relative name. |
+| The Cloudflare CNAME is proxied (orange cloud) | Set it to DNS only. |
+| A record does not pass yet | Wait. DNS changes take time. See below. |
+
+**DNS caches a "no record" answer.** A host can keep a "no record" answer for the negative TTL of the zone. This is the last number of the SOA record, often 1800 seconds (30 minutes). For example, a mail sent before the MX record existed is tried again. It goes out when the cache expires.
+
+In the console, such a mail shows as **Com erro** (amber), with the answer of the remote server, and we try it again. It shows as **Rejeitado** only when we stop trying.
+
+The console checks the records and shows each one as it passes. The domain can send when DKIM, SPF and MX (through the return path) pass.

@@ -15,6 +15,7 @@ import {
   Hexagon,
   ListX,
   Mail,
+  Network,
   Package,
   Rocket,
   Send,
@@ -43,6 +44,7 @@ const pages: Record<string, LucideIcon> = {
 
   '/docs/guides/webhooks': BellRing,
   '/docs/guides/domains': Globe,
+  '/docs/guides/subdomains': Network,
   '/docs/guides/credits': Coins,
 
   '/docs/sdks': Package,
