@@ -1,0 +1,62 @@
+---
+title: Webhooks
+description: A signed POST for each message that finishes, tried again for up to 48 hours, with at-least-once delivery.
+---
+
+Set a webhook URL on the page of the app. 1billion then sends a `POST` for each message that finishes:
+
+```json
+{
+  "id": "4a1e…",
+  "type": "bounced",
+  "message_id": "9f2c…",
+  "to": "jane@example.com",
+  "detail": "mx.example.com: 550 5.1.1 user unknown",
+  "created_at": "2026-10-30T12:00:03Z"
+}
+```
+
+## Event types
+
+| `type` | When |
+|---|---|
+| `delivered` | The server of the recipient accepted the mail. |
+| `bounced` | The server of the recipient refused it. `detail` has its answer. |
+| `unsubscribed` | A person left the domain with one-click unsubscribe. `detail` has the domain, and `message_id` is empty. |
+| `test` | The test button on the Webhooks page. `to` is `test@1billion.test`. Answer 2xx and ignore it. |
+
+Turn event types off for each app on the Webhooks page. A new type of event is on until you turn it off.
+
+## Delivery
+
+- Any status that is not 2xx is tried again with a backoff, for up to 48 hours.
+- Delivery is at least once. Use `id` to ignore an event you already handled.
+- A failed event shows on the Webhooks page, with a button to send it again. The new try is a new event, with a new `id`.
+
+## Check the signature
+
+Each event has three headers. Header names are not case sensitive.
+
+| Header | What |
+|---|---|
+| `1B-Event-Id` | The id of the event. |
+| `1B-Timestamp` | The time of the send, in Unix seconds. |
+| `1B-Signature` | `sha256=<hex>`: the HMAC-SHA256 of `<timestamp>.<raw body>` with the webhook secret of the app. |
+
+Copy the secret from the page of the app. Check the signature on the raw body, before you parse it, and refuse an old timestamp:
+
+```ruby
+class OneBillionWebhooksController < ActionController::API
+  def create
+    body = request.raw_post
+    timestamp = request.headers["1B-Timestamp"].to_s
+    expected = "sha256=" + OpenSSL::HMAC.hexdigest("SHA256", ENV.fetch("ONEBILLION_WEBHOOK_SECRET"), "#{timestamp}.#{body}")
+
+    return head :unauthorized unless ActiveSupport::SecurityUtils.secure_compare(expected, request.headers["1B-Signature"].to_s)
+    return head :unauthorized if (Time.now.to_i - timestamp.to_i).abs > 300
+
+    # Handle JSON.parse(body) here. Use "id" to ignore a repeated event.
+    head :no_content
+  end
+end
+```

@@ -1,0 +1,17 @@
+---
+title: Suppressions
+description: The suppression list keeps the addresses that bounced or left, and DELETE /suppressions/{address} takes one off.
+---
+
+A hard bounce puts the address on the suppression list of the app, and 1billion stops sending to it. This keeps the reputation of your domain. A mail to a suppressed address becomes a free message with the status `suppressed`.
+
+When the address works again, take it off:
+
+```http
+DELETE /suppressions/jane%40example.com
+Authorization: Bearer <API key>
+```
+
+URL-encode the `@` as `%40`. The answer is `204`. Errors: `401` bad API key, `404` the address is not on the list, `503` for a moment.
+
+The console has the same action, on the Suppressions page of the app.

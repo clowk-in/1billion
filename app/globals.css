@@ -1,0 +1,253 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+
+@source "../node_modules/fumadocs-ui/dist/**/*.js";
+
+/* brand: the purple of the console (apps/web application.tailwind.css), on a
+   dark ground. Archivo and JetBrains Mono, as in the console. */
+@theme {
+  --color-bg: #0c0a14;
+  --color-deep: #08070e;
+  --color-bar: #13101f;
+  --color-panel: #151126;
+  --color-panel2: #1d1833;
+  --color-line: #2b2545;
+  --color-line2: #3a3260;
+  --color-ink: #eeebf7;
+  --color-sub: #a7a0c2;
+  --color-brand: #6a35e6;
+  --color-brand-hover: #7c4bf0;
+  --color-brandtext: #b9a2ff;
+  --color-brandwash: #241a3d;
+  --color-ok: #3ddc97;
+  --color-amber: #f2b04e;
+  /* the backpack of Bila (brand/tokens.css --brand-lime): an accent, used a little */
+  --color-lime: #c6f432;
+
+  --font-sans: var(--font-archivo), system-ui, sans-serif;
+  --font-display: var(--font-archivo), system-ui, sans-serif;
+  --font-mono: var(--font-mono-face), ui-monospace, Menlo, monospace;
+}
+
+/* docs: Fumadocs colors from the same tokens. The site is dark only, and
+   Fumadocs sets its dark colors on .dark, so this block uses .dark too. */
+.dark,
+.dark #nd-sidebar {
+  --color-fd-background: #0c0a14;
+  --color-fd-foreground: #eeebf7;
+  --color-fd-muted: #151126;
+  --color-fd-muted-foreground: #a7a0c2;
+  --color-fd-popover: #151126;
+  --color-fd-popover-foreground: #eeebf7;
+  --color-fd-card: #151126;
+  --color-fd-card-foreground: #eeebf7;
+  --color-fd-border: #2b2545;
+  --color-fd-primary: #b9a2ff;
+  --color-fd-primary-foreground: #0c0a14;
+  --color-fd-secondary: #1d1833;
+  --color-fd-secondary-foreground: #eeebf7;
+  --color-fd-accent: #1d1833;
+  --color-fd-accent-foreground: #eeebf7;
+  --color-fd-ring: #b9a2ff;
+}
+
+/* docs: the geometry of the custom sidebar, as in the Blackevin docs. One
+   width for two readers: the sidebar itself and the offset of the layout. */
+:root {
+  --docs-sidebar-width: min(22vw, 272px);
+  --docs-content-width: 900px;
+}
+
+/* Fumadocs' own sidebar is off, so its width is zero and the space comes
+   back as padding on the left. */
+.docs-layout {
+  --fd-sidebar-width: 0px;
+  --fd-toc-width: 0px;
+  --fd-layout-width: 100%;
+  --fd-layout-offset: 0px;
+  --fd-page-width: var(--docs-content-width);
+  min-height: 100dvh;
+  overflow-x: clip;
+}
+
+/* On a phone the top bar of DocsSidebar is 56px tall. The page and the
+   table of contents bar start below it. */
+@media (max-width: 1023px) {
+  .docs-layout {
+    --fd-nav-height: calc(56px + env(safe-area-inset-top));
+    padding-top: var(--fd-nav-height);
+  }
+}
+
+/* On a wide screen the layout takes the whole width right of the sidebar,
+   so the grid gutters collapse and the page starts at the sidebar. The table
+   of contents column is the rest, so the anchors sit beside the text. */
+@media (min-width: 1024px) {
+  .docs-layout {
+    --fd-toc-width: max(0px, calc(100% - var(--docs-content-width)));
+    padding-inline-start: var(--docs-sidebar-width);
+  }
+}
+
+/* The page stays at the sidebar, not in the middle of its column. min-width
+   0 lets a long code line scroll in its block, not widen the page. */
+.docs-layout #nd-page {
+  margin-inline: 0;
+  max-width: var(--docs-content-width);
+  min-width: 0;
+}
+
+.docs-layout #nd-toc {
+  width: 268px;
+}
+
+.docs-layout [data-fd-doc] pre {
+  overflow-x: auto;
+}
+
+/* docs code on a phone: a smaller font, so more of each line shows */
+@media (max-width: 639px) {
+  .docs-layout [data-fd-doc] pre {
+    font-size: 12px;
+  }
+}
+
+.docs-sidebar {
+  width: 100vw;
+  max-width: 300px;
+}
+
+@media (min-width: 1024px) {
+  .docs-sidebar {
+    width: var(--docs-sidebar-width);
+    max-width: none;
+  }
+}
+
+/* base */
+html {
+  background: var(--color-bg);
+  color-scheme: dark;
+}
+
+body {
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+}
+
+/* No visible scrollbars, as in the console. Areas still scroll with a
+   trackpad, a wheel, touch, and the keyboard. */
+* {
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+}
+
+::selection {
+  background: var(--color-brandwash);
+  color: var(--color-brandtext);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brandtext);
+  outline-offset: 2px;
+}
+
+/* docs: the radius of the brand, and the code font */
+#nd-docs-layout,
+#nd-page {
+  --radius: 8px;
+}
+
+.prose pre,
+.prose code {
+  font-variant-ligatures: none;
+}
+
+.prose :where(code):not(:where(pre code)) {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+}
+
+.prose pre,
+.prose figure {
+  border-radius: 8px;
+}
+
+/* landing: code panels from the Shiki highlighter */
+.code-panel pre {
+  margin: 0;
+  padding: 16px 18px;
+  overflow-x: auto;
+  tab-size: 4;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.65;
+  background: transparent !important;
+  font-variant-ligatures: none;
+}
+
+.code-panel pre code {
+  display: grid;
+}
+
+.code-panel pre .line {
+  padding-inline: 0;
+}
+
+/* code panels on a phone: a smaller font, so the longest lines fit */
+@media (max-width: 639px) {
+  .code-panel pre {
+    padding: 14px 14px;
+    font-size: 11px;
+  }
+}
+
+/* landing: the buy button of the console (apps/web .buy-credits.lg): the
+   brand purple, a darker bottom edge that reads as a key, and a purple glow */
+.btn-buy {
+  background: #6a35e6;
+  border: 1px solid #6a35e6;
+  border-bottom: 2px solid #46209f;
+  color: #ffffff;
+  box-shadow: 0 6px 18px rgb(109 40 217 / 0.35);
+  transition: background-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.btn-buy:hover {
+  background: #5a2bd1;
+  border-color: #5a2bd1;
+  border-bottom-color: #46209f;
+  box-shadow: 0 8px 24px rgb(109 40 217 / 0.5);
+}
+
+.btn-buy:active {
+  transform: translateY(1px);
+  border-bottom-width: 1px;
+}
+
+/* landing: line numbers in the code editor of the send example */
+.code-editor pre code {
+  counter-reset: line;
+}
+
+.code-editor pre .line::before {
+  counter-increment: line;
+  content: counter(line);
+  display: inline-block;
+  width: 2ch;
+  margin-right: 18px;
+  text-align: right;
+  color: #4c4470;
+}
+
+/* landing: the routes of the hero art. A dot travels each route, and the
+   motion stops when the reader asks for less. */
+@media (prefers-reduced-motion: reduce) {
+  .hero-dot {
+    display: none;
+  }
+}

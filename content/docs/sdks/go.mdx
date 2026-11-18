@@ -1,0 +1,49 @@
+---
+title: Go
+description: The module github.com/clowk-in/1billion-go sends mail with the standard library only.
+---
+
+```bash
+go get github.com/clowk-in/1billion-go
+```
+
+Go 1.24 or newer. The package name is `onebillion`: a Go name can not start with a digit.
+
+```go
+client := onebillion.New(os.Getenv("ONEBILLION_KEY"))
+
+out, err := client.Send(ctx, onebillion.Mail{
+	From:     "Acme <hi@acme.com>",
+	To:       []string{"jane@example.com"},
+	Subject:  "Your code",
+	Text:     "Your code is 482 913",
+	Priority: "high",
+}, onebillion.IdempotencyKey("login-jane-482913"))
+
+msg, err := client.Message(ctx, out.Messages[0].ID)
+err = client.Unsuppress(ctx, "jane@example.com")
+v, err := client.Validate(ctx, "jane@gmial.com")
+```
+
+## Errors
+
+```go
+switch {
+case onebillion.NoCredits(err):
+	// 429: the credits come back at 00:00 in the time zone of the workspace.
+case onebillion.Refused(err):
+	// 422: a bad message or a recipient that failed a check.
+case err != nil:
+	// *onebillion.Error has Status (0 for a network error) and Message.
+}
+```
+
+## Options
+
+| Option | Default | What |
+|---|---|---|
+| `WithURL` | the 1billion API | another console, for example a dev stack |
+| `WithHTTPClient` | a client with a 10 s timeout | your own `*http.Client` |
+| `WithBackoff` | 500 ms | the first wait between tries |
+
+Source and changelog: [clowk-in/1billion-go](https://github.com/clowk-in/1billion-go).

@@ -1,0 +1,10 @@
+{
+  "title": "SDKs",
+  "pages": [
+    "index",
+    "ruby",
+    "javascript",
+    "go",
+    "aws-lambda"
+  ]
+}

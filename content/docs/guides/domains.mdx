@@ -1,0 +1,29 @@
+---
+title: Domains and DNS
+description: The DNS records that let a domain send with 1billion, and the switches of each domain.
+---
+
+Each app sends only from its verified domains. Add a domain on the page of the app, and add these records at your DNS provider:
+
+| Type | Name | Value | Required |
+|---|---|---|---|
+| TXT | `1billion._domainkey.<domain>` | The DKIM public key that the console shows | yes |
+| CNAME | `1billion.<domain>` | Our return path, which the console shows | yes |
+| TXT | `_dmarc.<domain>` | A DMARC policy, for example `v=DMARC1; p=none;` | no, but recommended |
+
+- **DKIM** signs each mail with the private key of the domain. We keep that key encrypted, and it never leaves our servers.
+- **The return path** is a CNAME to our host, which holds the SPF and the MX. When our servers change, only our records change: you never edit your DNS again.
+- **DMARC** is only a warning in the console. Mailbox providers trust a domain with DMARC more.
+
+The console checks the records for you and shows each one as it passes. The domain can send when DKIM, SPF and MX pass. A new DKIM key sets the domain back to pending until the new record is in DNS.
+
+## Switches of a domain
+
+Each switch starts off, and a change works on the next mail.
+
+- **List-Unsubscribe**: adds the one-click unsubscribe headers (RFC 8058), with a link for each recipient. A person who leaves stops getting mail from that domain only, so send marketing from another domain: the login mail of your main domain still arrives.
+- **X-Report-Abuse-To**: adds `abuse@<domain>`. That mailbox must exist.
+
+## Credits for domains
+
+The first domain of a workspace is free. See [Credits](/docs/guides/credits).

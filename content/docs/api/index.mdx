@@ -1,0 +1,86 @@
+---
+title: API reference
+description: The base URL, the API key, the errors and the rules that every endpoint of 1billion follows.
+---
+
+The base URL is `https://api.1billion.clowk.in`. The OpenAPI file is at [`/openapi.yml`](https://api.1billion.clowk.in/openapi.yml).
+
+| Endpoint | What it does |
+|---|---|
+| [`POST /send`](/docs/api/send) | Sends a mail to up to 50 recipients. |
+| [`GET /messages/{id}`](/docs/api/messages) | Reads the state of one recipient. |
+| [`DELETE /suppressions/{address}`](/docs/api/suppressions) | Takes an address off the suppression list. |
+| [`POST /validate`](/docs/api/validate) | Gives the verdict of an address, and sends nothing. |
+
+## Any language
+
+The API is plain HTTP and JSON, so any language can call it with no SDK. In Rust, with `reqwest` (features `json`) and `serde_json`:
+
+```rust
+use serde_json::json;
+
+#[tokio::main]
+async fn main() -> Result<(), reqwest::Error> {
+    let key = std::env::var("ONEBILLION_KEY").expect("ONEBILLION_KEY is not set");
+
+    let answer = reqwest::Client::new()
+        .post("https://api.1billion.clowk.in/send")
+        .bearer_auth(key)
+        .header("Idempotency-Key", "login-jane-482913")
+        .json(&json!({
+            "from": "Acme <hi@acme.com>",
+            "to": "jane@example.com",
+            "subject": "Your code",
+            "body": { "text": "Your code is 482 913" },
+            "priority": "high"
+        }))
+        .send()
+        .await?
+        .error_for_status()?
+        .text()
+        .await?;
+
+    println!("{answer}");
+
+    Ok(())
+}
+```
+
+The text and the HTML go inside `body`: a `text` at the top of the JSON is not read, and the answer is `422`. The SDKs take `text` and `html` and build `body` for you.
+
+## Authentication
+
+Send the API key of an app in the `Authorization` header:
+
+```http
+Authorization: Bearer <API key>
+Content-Type: application/json
+```
+
+Make the key in the console, in the page of the app. A key sends only from the verified domains of its app. Keep it on a server: a key must never reach a browser.
+
+## Errors
+
+An error answer has a JSON body with `error`, and more fields for some errors.
+
+| Status | When |
+|---|---|
+| `400` | The JSON is bad, or a body over 4 MB came without `Content-Type: application/json`. |
+| `401` | The API key is bad. |
+| `403` | The sends of the workspace are paused: its reputation of the last 30 days is under 90%, with 100 sends or more. A person reviews it. |
+| `404` | No such message or address, or it belongs to another app. |
+| `422` | A bad message, a domain that is not verified or not of this app, or a recipient that failed a check (`check`, `address`). |
+| `429` | No credits for these recipients today (`retry_after`, `buy_url`, and the `Retry-After` header). |
+| `503` | The service is down for a moment (`Retry-After`). |
+
+## Retries
+
+Only a `503` and a network error are worth a retry. Every other error gives the same answer the next time. The SDKs try again 3 times in all, with the same `Idempotency-Key`, so a retry never sends a mail twice.
+
+## Idempotency
+
+Send an `Idempotency-Key` header with `POST /send`. The same key from the same app in 30 days returns the first answer (`200`) and sends nothing new. Use a key that names the mail, such as `login-jane-482913` or `receipt-8812`.
+
+## Pace
+
+The API answers at once, and each mail waits for its slot. A workspace on the credits of the day sends 1 mail every 3 seconds. A workspace with a credit pack sends 5 a second, with a burst of 25%. A big request takes longer to go out; it never fails for the pace.

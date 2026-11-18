@@ -1,0 +1,106 @@
+---
+title: Node.js, Next.js and Bun
+description: The package @clowk/1billion sends from Node.js 22 or newer, a Next.js route or Bun, with types for each request and answer.
+---
+
+```bash
+pnpm add @clowk/1billion
+```
+
+Node.js 22 or newer, or Bun. The package is ESM only, with no dependencies.
+
+```ts
+import { OneBillion, OneBillionError } from "@clowk/1billion"
+
+const mail = new OneBillion(process.env.ONEBILLION_KEY)
+
+const { messages } = await mail.send({
+  from: "Acme <hi@acme.com>",
+  to: "jane@example.com",
+  subject: "Your code",
+  text: "Your code is 482 913",
+  priority: "high",
+  idempotencyKey: "login-jane-482913",
+})
+
+await mail.message(messages[0].id)
+await mail.unsuppress("jane@example.com")
+await mail.validate("jane@gmial.com")
+```
+
+## Next.js
+
+Call it from a route handler or a server action. Keep `ONEBILLION_KEY` without the `NEXT_PUBLIC_` prefix, so it never goes to the browser.
+
+```ts
+// app/api/login/route.ts
+import { OneBillion } from "@clowk/1billion"
+
+const mail = new OneBillion(process.env.ONEBILLION_KEY)
+
+export async function POST(request: Request) {
+  const { email } = await request.json()
+
+  await mail.send({ from: "Acme <hi@acme.com>", to: email, subject: "Your login link", html: "…", priority: "high" })
+
+  return Response.json({ ok: true })
+}
+```
+
+## Front-end apps
+
+The SDK is for the server only. Do not call it, or the API, from code that runs in the browser: a React or Solid app built with Vite, a client component, a mobile app.
+
+- **It does not work.** The API sends no CORS headers, so the browser blocks the request before it leaves.
+- **It must not work.** A `VITE_*` or `NEXT_PUBLIC_*` variable goes into the JavaScript bundle. Anyone can copy the key from it and send mail from your domain, with your DKIM and your credits.
+
+Call 1billion from your server, and let your front end call your server:
+
+```ts
+// server: Hono, Express, a Next.js route, a SolidStart server function
+import { OneBillion } from "@clowk/1billion"
+
+const mail = new OneBillion(process.env.ONEBILLION_KEY)
+
+app.post("/api/login-code", async c => {
+  const { email } = await c.req.json()
+
+  await mail.send({ from: "Acme <hi@acme.com>", to: email, subject: "Your code", text: "…", priority: "high" })
+
+  return c.json({ ok: true })
+})
+```
+
+```ts
+// browser
+await fetch("/api/login-code", { method: "POST", body: JSON.stringify({ email }) })
+```
+
+## Errors
+
+```ts
+try {
+  await mail.send(message)
+} catch (error) {
+  if (!(error instanceof OneBillionError)) throw error
+
+  if (error.noCredits) {
+    // 429: error.body.retry_after, error.body.buy_url
+  } else if (error.refused) {
+    // 422: error.body.check, error.body.address
+  }
+}
+```
+
+`error.status` is the HTTP status, and `0` for a network error.
+
+## Options
+
+| Option | Default | What |
+|---|---|---|
+| `url` | the 1billion API | another console, for example a dev stack |
+| `timeoutMs` | `10000` | the timeout of each try |
+| `backoffMs` | `500` | the first wait between tries |
+| `fetch` | the global `fetch` | your own `fetch` |
+
+Source and changelog: [clowk-in/1billion-js](https://github.com/clowk-in/1billion-js).

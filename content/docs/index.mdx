@@ -1,0 +1,31 @@
+---
+title: Introduction
+description: 1billion sends transactional e-mail from its own servers. One API call sends the mail, and you follow each recipient until delivery.
+---
+
+1billion is an e-mail API for the mail that a person waits for: login codes, magic links, password resets, receipts and alerts. We run the sending servers (the MTA), sign each domain with its own DKIM key, and keep every message for 30 days, so you can see what happened to it.
+
+<Cards>
+  <Card title="Quickstart" href="/docs/getting-started" description="Send your first mail in five minutes." />
+  <Card title="API reference" href="/docs/api" description="POST /send, messages, suppressions and validation." />
+  <Card title="Webhooks" href="/docs/guides/webhooks" description="Signed events when a mail is delivered or bounces." />
+  <Card title="SDKs" href="/docs/sdks" description="Ruby with ActionMailer, Node.js, Next.js, Bun and Go." />
+</Cards>
+
+## How a mail goes
+
+1. Your app calls `POST /send` with an API key. Every check that can refuse the mail runs now, and a bad recipient gets `422` and costs nothing.
+2. The API answers `202` at once, with one message id for each recipient.
+3. The mail waits for its slot in the queue of your workspace. High priority goes first.
+4. Our MTA signs it with the DKIM key of your domain and delivers it over SMTP.
+5. Your webhook gets a signed `delivered` or `bounced` event.
+
+## The words
+
+| Word | What it is |
+|---|---|
+| Workspace | Your account. It holds the credits, the apps and the members. |
+| App | One of your products. It has its API keys, its domains, its webhook and its suppression list. |
+| Domain | The domain in `from`, verified with DNS records. |
+| Message | One recipient of one send. A send to three people makes three messages. |
+| Credits | What a send costs. The free plan gives 100 mails a day. |

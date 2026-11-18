@@ -1,0 +1,67 @@
+---
+title: Send a mail
+description: POST /send sends one mail to up to 50 recipients, with text, HTML, attachments and a priority.
+---
+
+```http
+POST /send
+Authorization: Bearer <API key>
+Content-Type: application/json
+Idempotency-Key: receipt-8812
+```
+
+```json
+{
+  "from": "Acme <hi@acme.com>",
+  "to": ["jane@example.com"],
+  "cc": ["team@acme.com"],
+  "bcc": ["audit@acme.com"],
+  "reply_to": "help@acme.com",
+  "subject": "Your receipt",
+  "body": {
+    "html": "<p>Thanks for your order.</p>",
+    "text": "Thanks for your order."
+  },
+  "attachments": [
+    { "filename": "receipt.pdf", "content_type": "application/pdf", "content": "<base64>" }
+  ],
+  "priority": "normal"
+}
+```
+
+## Fields
+
+| Field | Required | What |
+|---|---|---|
+| `from` | yes | A sender on a verified domain of the app, with a name or without one. |
+| `to`, `cc`, `bcc` | one of them | One address or a list. 50 recipients in all. `bcc` does not go in the message. |
+| `subject` | yes | The subject. |
+| `body` | yes | `html`, `text` or both. A mail with both gets a better score. |
+| `reply_to` | no | The reply address. |
+| `attachments` | no | Files: `filename`, `content` in base64, and an optional `content_type`. |
+| `priority` | no | `normal` (the default) or `high`. |
+| `raw` | no | A finished MIME message, in place of the fields above, with `to`. |
+
+- The whole message has a limit of 15 MB. Base64 adds about 33%.
+- A message with more than one `From` header gets `422`.
+- `high` priority is for mail that a person waits for: a code, a magic link, a password reset. It goes first in the queue of the workspace. It does not skip the limit of each receiving domain.
+
+## The checks
+
+Before it accepts the mail, the API checks each recipient for free: the syntax, a domain that receives mail, no disposable inbox and no role address (`contact@`, `noreply@`). The first recipient that fails gets `422` with `check` and `address`, and nothing is sent or charged. A role address goes when the app accepts role addresses (a switch on the page of the app).
+
+A recipient on the suppression list becomes a message with the status `suppressed`. It costs nothing.
+
+## The answer
+
+`202` for a new send, or `200` for an `Idempotency-Key` seen before:
+
+```json
+{ "messages": [{ "id": "9f2c…", "to": "jane@example.com", "status": "accepted" }] }
+```
+
+`accepted` means that 1billion has the mail. All that can refuse a mail happens before this answer. A problem later, such as a bounce, comes as a [webhook](/docs/guides/webhooks).
+
+## Headers we add
+
+The MTA adds `X-OneBillion-Id` and `Feedback-ID`, and `Date` and `Message-ID` when the mail has none. All of them are in the DKIM signature. The envelope sender is `bounces+<message id>@1billion.<your domain>`, so a late bounce tells which message it is about.

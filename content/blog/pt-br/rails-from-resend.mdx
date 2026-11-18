@@ -1,0 +1,171 @@
+---
+title: Migre um app Rails da Resend para o 1billion
+description: A migração passo a passo de um app Rails do gem da Resend para o 1billion, um mailer por vez, sem um dia em que o e-mail para.
+date: '2026-11-18T18:00:00Z'
+author: Thadeu Esteves
+---
+
+O seu app Rails envia e-mail com a Resend, e você quer testar o 1billion. Não precisa de um grande dia de troca. Os dois serviços rodam lado a lado, e você move um mailer por vez, começando pelo que mais importa: o código de login.
+
+Este post mostra cada passo. Os mailers e as views do seu app não mudam.
+
+## De onde você parte
+
+Com a Resend, um app Rails tem o gem `resend`, uma chave num initializer e uma linha de config:
+
+```ruby
+# Gemfile
+gem "resend"
+
+# config/initializers/mailer.rb
+Resend.api_key = ENV["RESEND_API_KEY"]
+
+# config/environments/production.rb
+config.action_mailer.delivery_method = :resend
+```
+
+## 1. Adicione o gem do 1billion
+
+```bash
+bundle add 1billion
+```
+
+Mantenha o gem `resend` por enquanto. Os dois delivery methods convivem, e o gem `1billion` adiciona um chamado `:onebillion`. Coloque as configurações dele junto das outras:
+
+```ruby
+# config/environments/production.rb
+config.action_mailer.delivery_method = :resend
+config.action_mailer.onebillion_settings = {
+  api_key: Rails.application.credentials.dig(:onebillion, :api_key)
+}
+```
+
+Crie a chave de API no [console](https://app.1billion.clowk.in), na página do seu app, e guarde nas suas credentials. Guardamos só o hash de cada chave: se perder uma, crie outra e revogue a antiga.
+
+![A página de um app no console do 1billion: as chaves de API, o domínio verificado, o webhook e a opção de endereços de função.](/blog/rails-from-resend/app-keys.png)
+
+## 2. Verifique o domínio, com a Resend ainda ligada
+
+Adicione o seu domínio ao app no console. São dois registros obrigatórios: um TXT em `1billion._domainkey.<domínio>` com a chave DKIM, e um CNAME para o return path, que leva o SPF e o MX. O return path é `1billion.<domínio>` por padrão, e o console mostra o nome e o valor exatos para copiar. Uma política DMARC é recomendada; se o seu domínio já tem uma, mantenha.
+
+Na Cloudflare, deixe os registros como DNS only (a nuvem cinza).
+
+![A página de um domínio no console do 1billion: os registros de DKIM, return path e DMARC, cada um verificado, e um cURL para enviar o primeiro e-mail.](/blog/rails-from-resend/domain-dns.png)
+
+Esses nomes não são os que a Resend usa, então os registros dos dois serviços ficam juntos no seu DNS. A Resend continua enviando enquanto o console checa os registros novos. Veja [Domains and DNS](/docs/guides/domains).
+
+## 3. Mova um mailer
+
+Um mailer pode escolher o seu próprio delivery method. Comece pelo e-mail que a pessoa espera:
+
+```ruby
+class LoginMailer < ApplicationMailer
+  self.delivery_method = :onebillion
+
+  def code(user, code)
+    @code = code
+
+    mail(to: user.email, subject: "Seu código")
+  end
+end
+```
+
+Todos os outros mailers continuam pela Resend. Acompanhe o e-mail de login no console por um dia: cada destinatário tem a sua mensagem, com o status e a última resposta do servidor remoto.
+
+## 4. Impeça que um job repetido envie duas vezes
+
+O gem envia a mensagem MIME pronta, e usa o `Message-ID` dela como `Idempotency-Key`: a mesma chave em 30 dias devolve a primeira resposta e não envia nada de novo.
+
+O `deliver_later` gera o e-mail de novo dentro do job. Se o job roda duas vezes, a segunda tem um `Message-ID` novo, então é um e-mail novo. Para o e-mail que nunca pode sair duas vezes, defina um `Message-ID` que dê nome ao e-mail:
+
+```ruby
+mail(
+  to: user.email,
+  subject: "Seu código",
+  message_id: "<login-#{user.id}-#{code}@acme.com>"
+)
+```
+
+## 5. Decida o que uma entrega que falhou faz
+
+O gem já tenta de novo num `503` ou num erro de rede, 3 vezes, com a mesma chave. Os outros erros chegam ao job de entrega, e você escolhe o que cada um faz:
+
+```ruby
+# config/initializers/onebillion.rb
+Rails.application.config.after_initialize do
+  # O serviço ficou fora mais tempo do que o gem espera: tente depois.
+  ActionMailer::MailDeliveryJob.retry_on OneBillion::Error, wait: :polynomially_longer, attempts: 10
+
+  # Sem créditos hoje: eles voltam à meia-noite, no fuso do workspace.
+  ActionMailer::MailDeliveryJob.retry_on OneBillion::NoCredits, wait: 1.hour, attempts: 24
+
+  # Mensagem ruim ou destinatário que falhou numa checagem: repetir dá a mesma resposta.
+  ActionMailer::MailDeliveryJob.discard_on OneBillion::Refused
+end
+```
+
+`NoCredits` e `Refused` são tipos de `OneBillion::Error`. O Active Job olha primeiro o handler declarado por último, então declare o geral primeiro, como aqui.
+
+## 6. Mova as chamadas à API
+
+Código que chama a API da Resend direto tem uma troca de um para um:
+
+```ruby
+# Antes
+Resend::Emails.send({
+  from: "Acme <hi@acme.com>",
+  to: ["jane@example.com"],
+  subject: "Seu recibo",
+  html: "<p>Obrigado pelo pedido.</p>"
+})
+
+# Depois
+client = OneBillion::Client.new(api_key: Rails.application.credentials.dig(:onebillion, :api_key))
+
+client.send_mail(
+  from: "Acme <hi@acme.com>",
+  to: ["jane@example.com"],
+  subject: "Seu recibo",
+  html: "<p>Obrigado pelo pedido.</p>",
+  idempotency_key: "receipt-#{order.id}"
+)
+```
+
+## 7. Mova os webhooks
+
+A Resend assina os webhooks com headers do Svix. O 1billion envia `1B-Timestamp` e `1B-Signature`: o HMAC-SHA256 de `<timestamp>.<corpo bruto>` com o segredo do app. Os eventos são `delivered`, `bounced` e `unsubscribed`:
+
+```ruby
+class OneBillionWebhooksController < ActionController::API
+  def create
+    body = request.raw_post
+    timestamp = request.headers["1B-Timestamp"].to_s
+    expected = "sha256=" + OpenSSL::HMAC.hexdigest("SHA256", Rails.application.credentials.dig(:onebillion, :webhook_secret), "#{timestamp}.#{body}")
+
+    return head :unauthorized unless ActiveSupport::SecurityUtils.secure_compare(expected, request.headers["1B-Signature"].to_s)
+    return head :unauthorized if (Time.now.to_i - timestamp.to_i).abs > 300
+
+    event = JSON.parse(body)
+
+    # event["type"], event["to"], event["message_id"]. Use event["id"] para ignorar uma repetição.
+    head :no_content
+  end
+end
+```
+
+Deixe os dois endpoints rodando enquanto os dois serviços enviam. Veja [Webhooks](/docs/guides/webhooks).
+
+## 8. Troque o resto, e tire a Resend
+
+Quando o e-mail de login estiver bem, mude o padrão e tire o `self.delivery_method` dos mailers:
+
+```ruby
+# config/environments/production.rb
+config.action_mailer.delivery_method = :onebillion
+```
+
+Depois tire o gem `resend`, o initializer e a chave dele, e remova os registros DNS dele quando tiver certeza.
+
+## Quanto custa
+
+Os primeiros 100 e-mails de cada dia são grátis, todo dia: cada workspace recebe 100.000 créditos à meia-noite, e um e-mail para um destinatário custa 1.000. Leia [Grátis para sempre, para sempre!](/pt-br/blog/free-forever/) para saber por que conseguimos.

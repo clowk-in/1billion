@@ -1,0 +1,77 @@
+---
+title: AWS Lambda
+description: Send from a Lambda function with the Node.js or the Go SDK, with a timeout that fits the retries and an Idempotency-Key from the event.
+---
+
+The SDKs need nothing that Lambda does not have: the Node.js SDK uses `fetch` (Node.js 22 or newer), and the Go SDK uses the standard library (`provided.al2023`).
+
+## Two things to set
+
+1. **The timeout of the function.** The default of Lambda is 3 seconds. A client tries up to 3 times, and each try waits for its timeout. With a timeout of 5 seconds for each try, the worst case is 5 + 0.5 + 5 + 1 + 5 = 16.5 seconds. Give the function 20 seconds or more, or a smaller timeout for each try.
+2. **A fixed Idempotency-Key.** Lambda runs a failed asynchronous invocation again. Build the key from the event, so a repeated run returns the first answer and sends nothing new. A key that the client makes is new on each run.
+
+## Node.js
+
+```js
+// index.mjs, runtime nodejs22.x or newer
+import { OneBillion } from "@clowk/1billion"
+
+// Outside the handler, so a warm function keeps it.
+const mail = new OneBillion(process.env.ONEBILLION_KEY, { timeoutMs: 5000 })
+
+export const handler = async (event) => {
+  await mail.send({
+    from: "Acme <hi@acme.com>",
+    to: event.email,
+    subject: "Your code",
+    text: `Your code is ${event.code}`,
+    priority: "high",
+    idempotencyKey: `login-${event.email}-${event.code}`,
+  })
+}
+```
+
+## Go
+
+```go
+package main
+
+import (
+	"context"
+	"net/http"
+	"os"
+	"time"
+
+	"github.com/aws/aws-lambda-go/lambda"
+	onebillion "github.com/clowk-in/1billion-go"
+)
+
+// Outside the handler, so a warm function keeps it.
+var client = onebillion.New(
+	os.Getenv("ONEBILLION_KEY"),
+	onebillion.WithHTTPClient(&http.Client{Timeout: 5 * time.Second}),
+)
+
+type Event struct {
+	Email string `json:"email"`
+	Code  string `json:"code"`
+}
+
+func handler(ctx context.Context, event Event) error {
+	_, err := client.Send(ctx, onebillion.Mail{
+		From:     "Acme <hi@acme.com>",
+		To:       []string{event.Email},
+		Subject:  "Your code",
+		Text:     "Your code is " + event.Code,
+		Priority: "high",
+	}, onebillion.IdempotencyKey("login-"+event.Email+"-"+event.Code))
+
+	return err
+}
+
+func main() {
+	lambda.Start(handler)
+}
+```
+
+Keep `ONEBILLION_KEY` in the environment of the function, from AWS Secrets Manager or Parameter Store, never in the code.

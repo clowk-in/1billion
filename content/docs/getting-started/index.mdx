@@ -1,0 +1,119 @@
+---
+title: Quickstart
+description: Make an account, verify a domain, and send your first mail with cURL or an SDK.
+---
+
+<Steps>
+<Step>
+
+### Make an account
+
+Open the [console](https://app.1billion.clowk.in) and sign in. A new workspace gets the credits of its first day at once: 100 mails, and 100 more each day.
+
+</Step>
+<Step>
+
+### Add your domain
+
+In the console, open your app and add the domain you send from, for example `acme.com`. The console shows the DNS records to add:
+
+| Type | Name | Value |
+|---|---|---|
+| TXT | `1billion._domainkey.acme.com` | the DKIM public key of the domain |
+| CNAME | `1billion.acme.com` | our return path, which holds the SPF and the MX |
+| TXT | `_dmarc.acme.com` | a DMARC policy (recommended, not required) |
+
+The console checks the records for you. The domain can send when DKIM, SPF and MX pass. See [Domains and DNS](/docs/guides/domains).
+
+</Step>
+<Step>
+
+### Make an API key
+
+In the app, make an API key and keep it in an environment variable, for example `ONEBILLION_KEY`. Use it only on a server: an API key must never reach a browser.
+
+</Step>
+<Step>
+
+### Send
+
+<Tabs items={['cURL', 'Rails', 'Node.js', 'Go']}>
+<Tab value="cURL">
+
+```bash
+curl https://api.1billion.clowk.in/send \
+  -H "Authorization: Bearer $ONEBILLION_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "from": "Acme <hi@acme.com>",
+    "to": "jane@example.com",
+    "subject": "Your code",
+    "body": { "text": "Your code is 482 913" },
+    "priority": "high"
+  }'
+```
+
+</Tab>
+<Tab value="Rails">
+
+```ruby
+# Gemfile
+gem "1billion"
+
+# config/environments/production.rb
+config.action_mailer.delivery_method = :onebillion
+config.action_mailer.onebillion_settings = { api_key: ENV["ONEBILLION_KEY"] }
+```
+
+Your mailers do not change. Send with `deliver_later`.
+
+</Tab>
+<Tab value="Node.js">
+
+```ts
+import { OneBillion } from "@clowk/1billion"
+
+const mail = new OneBillion(process.env.ONEBILLION_KEY)
+
+await mail.send({
+  from: "Acme <hi@acme.com>",
+  to: "jane@example.com",
+  subject: "Your code",
+  text: "Your code is 482 913",
+  priority: "high",
+})
+```
+
+</Tab>
+<Tab value="Go">
+
+```go
+client := onebillion.New(os.Getenv("ONEBILLION_KEY"))
+
+_, err := client.Send(ctx, onebillion.Mail{
+	From:     "Acme <hi@acme.com>",
+	To:       []string{"jane@example.com"},
+	Subject:  "Your code",
+	Text:     "Your code is 482 913",
+	Priority: "high",
+})
+```
+
+</Tab>
+</Tabs>
+
+The answer is `202`, with the id of each message:
+
+```json
+{ "messages": [{ "id": "9f2c…", "to": "jane@example.com", "status": "accepted" }] }
+```
+
+</Step>
+<Step>
+
+### Follow the mail
+
+Open the message in the console, call [`GET /messages/{id}`](/docs/api/messages), or add a [webhook](/docs/guides/webhooks) to get an event when it is delivered.
+
+</Step>
+</Steps>

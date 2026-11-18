@@ -1,0 +1,69 @@
+---
+title: Ruby and Rails
+description: The gem 1billion sends from ActionMailer with one line, or from plain Ruby with OneBillion::Client.
+---
+
+```bash
+bundle add 1billion
+```
+
+Ruby 3.1 or newer. The gem is named `1billion`, and its code is under `OneBillion`: a Ruby constant can not start with a digit.
+
+## Rails (ActionMailer)
+
+```ruby
+# config/environments/production.rb
+config.action_mailer.delivery_method = :onebillion
+config.action_mailer.onebillion_settings = { api_key: ENV["ONEBILLION_KEY"] }
+```
+
+Your mailers and views do not change:
+
+```ruby
+UserMailer.login_code(user, "482913").deliver_later
+```
+
+The gem sends the finished MIME message to every recipient (`to`, `cc` and `bcc`), with the `Message-ID` as the `Idempotency-Key`. Send with `deliver_later`, so a slow network never holds a web request.
+
+## The client
+
+```ruby
+client = OneBillion::Client.new(api_key: ENV["ONEBILLION_KEY"])
+
+client.send_mail(
+  from: "Acme <hi@acme.com>",
+  to: ["jane@example.com"],
+  subject: "Your code",
+  text: "Your code is 482 913",
+  priority: "high",
+  idempotency_key: "login-jane-482913"
+)
+
+client.message("9f2c…")
+client.unsuppress("jane@example.com")
+client.validate("jane@gmial.com")
+```
+
+## Errors
+
+```ruby
+begin
+  client.send_mail(**mail)
+rescue OneBillion::NoCredits => error
+  # 429: error.body["retry_after"], error.body["buy_url"]
+rescue OneBillion::Refused => error
+  # 422: error.check, error.address
+rescue OneBillion::Error => error
+  # Any other answer: error.status (nil for a network error), error.body
+end
+```
+
+## Options
+
+| Option | Default | What |
+|---|---|---|
+| `url:` | the 1billion API | another console, for example a dev stack |
+| `timeout:` | `10` | seconds for each try |
+| `backoff:` | `0.5` | the first wait between tries, in seconds |
+
+Source and changelog: [clowk-in/1billion-ruby](https://github.com/clowk-in/1billion-ruby).

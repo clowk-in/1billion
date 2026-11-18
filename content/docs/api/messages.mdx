@@ -1,0 +1,34 @@
+---
+title: Read a message
+description: GET /messages/{id} returns the status of one recipient, its tries and the last answer of the remote server.
+---
+
+```http
+GET /messages/9f2c…
+Authorization: Bearer <API key>
+```
+
+```json
+{
+  "id": "9f2c…",
+  "to": "jane@example.com",
+  "status": "bounced",
+  "attempts": 1,
+  "last_error": "mx.example.com: 550 5.1.1 user unknown",
+  "created_at": "2026-10-30T12:00:00Z",
+  "updated_at": "2026-10-30T12:00:03Z"
+}
+```
+
+## Status
+
+| Status | What |
+|---|---|
+| `accepted` | 1billion has the mail. |
+| `queued` | The mail waits for its slot. |
+| `sending` | The MTA is talking to the server of the recipient. |
+| `sent` | The server of the recipient accepted the mail. |
+| `bounced` | The server of the recipient refused it. `last_error` has its answer. |
+| `suppressed` | The address is on the suppression list, so nothing was sent. |
+
+Finished messages stay for 30 days. Errors: `401` bad API key, `404` no message or a message of another app, `503` for a moment.

@@ -1,0 +1,56 @@
+---
+title: Grátis para sempre, para sempre!
+description: Todo workspace do 1billion recebe 100 mil créditos por dia, para sempre. Veja por que conseguimos dar isso, e o que mantém a oferta segura.
+date: '2026-11-18'
+author: Thadeu Esteves
+---
+
+Todo workspace do 1billion recebe **100.000 créditos todo dia**. Um e-mail para um destinatário custa 1.000 créditos, então são **100 e-mails por dia, todo dia, de graça**. Sem cartão, sem um teste que acaba em 14 dias, sem um plano que muda no ano que vem.
+
+"Grátis para sempre" é uma promessa grande. Este post explica por que conseguimos cumprir.
+
+## Nós rodamos os nossos servidores de e-mail
+
+Algumas APIs de e-mail são uma camada sobre outro provedor, e pagam a esse provedor por cada e-mail. Aí um plano grátis custa dinheiro a cada envio.
+
+O 1billion tem o seu próprio MTA: os servidores que assinam o seu e-mail com DKIM e falam SMTP com o Gmail, o Outlook e os outros. Pagamos pelos servidores, não por e-mail. Um e-mail a mais num servidor que já está rodando custa quase nada. É por isso que um plano grátis é possível.
+
+## Um workspace grátis envia num ritmo calmo
+
+A API responde `202` na hora, e então cada e-mail espera a sua vez. Um workspace nos créditos do dia envia **1 e-mail a cada 3 segundos**. Uma rajada de 100 códigos de login ainda sai, um pouco mais devagar; ela nunca falha.
+
+Esse ritmo é o rate limit que deixa a oferta segura. Um workspace grátis não vira uma mangueira de incêndio, e os nossos servidores nunca veem um pico vindo dele. 100 e-mails a 1 a cada 3 segundos são 5 minutos de trabalho por dia.
+
+## Os créditos não acumulam
+
+À meia-noite, no fuso do seu workspace, o saldo volta a 100.000 créditos. Os créditos do dia não passam para o dia seguinte. Então o máximo que um workspace grátis envia é 100 e-mails por dia, todo dia, e nunca 3.000 no último dia do mês.
+
+## E-mail ruim para antes de custar para alguém
+
+Antes de aceitar um e-mail, a API checa cada destinatário, de graça: a sintaxe, um domínio que recebe e-mail, nenhuma caixa descartável, nenhum endereço de função como `contato@`. Um destinatário que falha recebe `422`, e nada é enviado nem cobrado.
+
+Um endereço que deu bounce vai para a lista de supressão, e paramos de enviar para ele. Menos bounces mantêm alta a reputação do domínio, e a dos nossos servidores.
+
+## A reputação dos servidores é compartilhada, então nós a protegemos
+
+Todos os workspaces enviam dos mesmos IPs. Se um workspace envia spam, o e-mail de todos os outros pode cair no spam. Por isso, quando a reputação de um workspace cai abaixo de 90% nos últimos 30 dias (com 100 envios ou mais), os envios dele pausam, e uma pessoa olha o caso.
+
+![A página E-mails do console do 1billion: 37 e-mails enviados, 100% de taxa de entrega, 0 bounces, e a reputação do workspace em 100%, saudável.](/blog/free-forever/console.png)
+
+*O console mostra a reputação de cada workspace e de cada domínio nos últimos 30 dias, com a regra ao lado: um aviso abaixo de 95%, uma pausa abaixo de 90%.*
+
+É por isso que o plano grátis é para e-mail transacional: códigos de login, recibos, redefinição de senha, alertas. E-mail que a pessoa espera, num ritmo calmo, é o melhor e-mail para uma reputação.
+
+## Quem paga a conta
+
+Os apps que passam de 100 e-mails por dia compram um pacote de créditos: **1 bilhão de créditos por R$ 59,99, pagamento único**. Os créditos não vencem, não há mensalidade, e o ritmo sobe para 5 e-mails por segundo. Eles pagam pelos servidores, e o plano grátis continua grátis.
+
+![A página Uso e créditos do console do 1billion: os créditos restantes, o pacote de 1 bilhão de créditos por R$ 59,99, e o que custou créditos nos últimos 30 dias.](/blog/free-forever/credits.png)
+
+*Cada resultado tem o seu preço, e o console mostra todos: um e-mail que o servidor aceitou custa 1.000 créditos, um endereço que não existe custa 2.000, e um e-mail que não conseguimos enviar, ou que foi bloqueado pela nossa reputação, não custa nada.*
+
+O acordo é este: **você começa grátis e continua grátis enquanto é pequeno**. Quando o seu app envia mais, você paga pelo que envia, uma vez.
+
+## Comece agora
+
+Crie uma conta em [app.1billion.clowk.in](https://app.1billion.clowk.in), adicione o seu domínio, e envie o primeiro e-mail com o [guia rápido](/docs/getting-started). Os 100.000 créditos já estão lá.

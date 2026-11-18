@@ -1,0 +1,56 @@
+---
+title: Free forever, forever!
+description: Every 1billion workspace gets 100,000 credits every day, for good. Here is why we can give that away, and what keeps it safe.
+date: '2026-11-18'
+author: Thadeu Esteves
+---
+
+Every 1billion workspace gets **100,000 credits every day**. A mail to one recipient costs 1,000 credits, so that is **100 mails a day, every day, for free**. No card, no trial that ends after 14 days, no plan that changes next year.
+
+"Free forever" is a big promise. This post explains why we can keep it.
+
+## We run our own mail servers
+
+Some e-mail APIs are a layer over another provider, and they pay that provider for each mail. A free plan then costs them money on every send.
+
+1billion has its own MTA: the servers that sign your mail with DKIM and talk SMTP to Gmail, Outlook and the rest. We pay for the servers, not for each mail. One more mail on a server that already runs costs us almost nothing. That is the whole reason a free plan is possible.
+
+## A free workspace sends at a calm pace
+
+The API answers `202` at once, and then each mail waits for its slot. A workspace on the credits of the day sends **1 mail every 3 seconds**. A burst of 100 login codes still goes out, a little slower; it never fails.
+
+This pace is the rate limit that makes the offer safe. A free workspace can not turn into a firehose, and our servers never see a spike from it. 100 mails at 1 every 3 seconds is 5 minutes of work a day.
+
+## The credits do not pile up
+
+At midnight, in the time zone of your workspace, the balance goes back up to 100,000 credits. The credits of the day do not carry over. So the most that a free workspace can send is 100 mails a day, every day, and never 3,000 on the last day of the month.
+
+## Bad mail is stopped before it costs anyone
+
+Before the API accepts a mail, it checks each recipient, for free: the syntax, a domain that receives mail, no disposable inbox, no role address like `contact@`. A recipient that fails gets a `422`, and nothing is sent or charged.
+
+An address that bounced goes to the suppression list, and we stop sending to it. Fewer bounces keep the reputation of the domain, and of our servers, high.
+
+## The reputation of the servers is shared, so we guard it
+
+All workspaces send from the same IP addresses. If one workspace sends spam, the mail of every other workspace can land in the spam folder. So when the reputation of a workspace falls under 90% in the last 30 days (with 100 sends or more), its sends pause, and a person looks at it.
+
+![The E-mails page of the 1billion console: 37 mails sent, a 100% delivery rate, 0 bounces, and the workspace reputation at 100%, healthy.](/blog/free-forever/console.png)
+
+*The console shows the reputation of each workspace and of each domain over 30 days, with the rule next to it: a warning under 95%, a pause under 90%.*
+
+This is why the free plan is for transactional mail: login codes, receipts, resets, alerts. Mail that a person waits for, at a calm pace, is the best mail for a reputation.
+
+## Who pays for it
+
+The apps that grow past 100 mails a day buy a credit pack: **1 billion credits for R$ 59.99, paid once**. The credits never expire, there is no monthly fee, and the pace goes up to 5 mails a second. They pay for the servers, and the free plan stays free.
+
+![The Credits page of the 1billion console: the credits left, the pack of 1 billion credits for R$ 59.99, and what cost credits in the last 30 days.](/blog/free-forever/credits.png)
+
+*Each result has its price, and the console shows all of them: a mail the server took costs 1,000 credits, an address that does not exist costs 2,000, and a mail that we could not send, or that was blocked for our reputation, costs nothing.*
+
+That is the deal: **you start free and stay free while you are small**. When your app sends more, you pay for what you send, once.
+
+## Start now
+
+Make an account at [app.1billion.clowk.in](https://app.1billion.clowk.in), add your domain, and send your first mail with the [quickstart](/docs/getting-started). The 100,000 credits are already there.

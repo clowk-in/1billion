@@ -1,0 +1,23 @@
+---
+title: SDKs
+description: The official clients for Ruby and Rails, Node.js, Next.js and Bun, and Go. Each one is open source, MIT, with no dependencies.
+---
+
+<Cards>
+  <Card title="Ruby and Rails" href="/docs/sdks/ruby" description="gem 1billion, with an ActionMailer delivery method." />
+  <Card title="Node.js, Next.js and Bun" href="/docs/sdks/javascript" description="@clowk/1billion, in TypeScript, for the server." />
+  <Card title="Go" href="/docs/sdks/go" description="github.com/clowk-in/1billion-go, the standard library only." />
+</Cards>
+
+The three follow the same rules:
+
+- They send the API key in `Authorization`, and a `User-Agent` of their own, so the console shows which mails came from an SDK.
+- They try again only on a `503` or a network error, 3 times in all, with a wait that doubles (500 ms, then 1 s).
+- Each retry uses the same `Idempotency-Key`: the one you pass, or one the client makes. A retry never sends a mail twice.
+- No browser build: an API key must never reach a browser.
+
+| SDK | Install | Source |
+|---|---|---|
+| Ruby | `bundle add 1billion` | [clowk-in/1billion-ruby](https://github.com/clowk-in/1billion-ruby) |
+| JavaScript | `pnpm add @clowk/1billion` | [clowk-in/1billion-js](https://github.com/clowk-in/1billion-js) |
+| Go | `go get github.com/clowk-in/1billion-go` | [clowk-in/1billion-go](https://github.com/clowk-in/1billion-go) |

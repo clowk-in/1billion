@@ -1,0 +1,44 @@
+---
+title: Credits
+description: How 1billion counts a send, the free credits of each day, and what happens when they end.
+---
+
+Each workspace has a balance of credits. A mail to one recipient costs 1,000 credits.
+
+## The credits of the day
+
+Each day, at 00:00 in the time zone of the workspace (Brasília by default), the balance goes back up to 100,000 credits: 100 mails a day, every day, for free. A new workspace gets the credits of its first day at once. The credits of the day do not carry over.
+
+## What costs what
+
+| Result | Credits |
+|---|---|
+| A mail that the server of the recipient accepted | 1,000 |
+| An address that does not exist (`5.1.x`, or no such domain) | 2,000 |
+| A mail blocked for our reputation (`5.7.x`), or one we could not send | 0, we pay it back |
+| A recipient on the suppression list | 0 |
+| A recipient that fails a check before the send (`422`) | 0 |
+| A webhook event that your app answered with 2xx | 100 (a failed try costs nothing) |
+| An address validation (`POST /validate`) | 100 |
+| The first domain of a workspace | 0 |
+| Each domain after the first, one time | 1,000,000 |
+
+The console shows each line for the last 30 days, on the Credits page.
+
+## When the credits end
+
+A send with less than 1,000 credits for each recipient gets `429`, and nothing is sent. The body has `retry_after` (the seconds until the credits of the next day) and `buy_url`:
+
+```json
+{
+  "error": "not enough credits for 2 recipients: the credits of the day come back at 00:00 in America/Sao_Paulo, or buy a pack",
+  "retry_after": 41000,
+  "buy_url": "https://app.1billion.clowk.in/usage"
+}
+```
+
+## Credit packs
+
+A pack is 1 billion credits for R$ 59.99, paid once, with no monthly fee. The credits of a pack never expire, and a workspace with them sends 5 mails a second. Buy as many packs as you need: 2 packs are 2 billion credits.
+
+The credits of the day do not add to a pack: when the balance falls under 100,000, it goes back up to 100,000 at midnight.

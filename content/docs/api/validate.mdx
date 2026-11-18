@@ -1,0 +1,47 @@
+---
+title: Validate an address
+description: POST /validate gives the verdict of an address, its score and its signals. It sends nothing and costs 100 credits.
+---
+
+```http
+POST /validate
+Authorization: Bearer <API key>
+Content-Type: application/json
+```
+
+```json
+{ "address": "joao+1@gmial.com" }
+```
+
+```json
+{
+  "address": "joao+1@gmial.com", "user": "joao+1", "domain": "gmial.com",
+  "result": "risky", "reason": "possible_typo", "score": 0.2, "did_you_mean": "joao+1@gmail.com",
+  "free": false, "role": false, "disposable": false, "generated": false,
+  "subaddress": true, "base_address": "joao@gmial.com",
+  "mx_found": true, "mx_host": "mx.gmial.com", "suppressed": false, "history": null,
+  "duration_ms": 41, "valid": true, "checks": [{ "check": "syntax", "ok": true, "detail": "…" }], "credits": 100
+}
+```
+
+A validation costs 100 credits, debited before the check. With less than that, the answer is `429`, as for `/send`. It never asks the server of the recipient: an `RCPT TO` test would hurt the shared IP.
+
+## The verdict
+
+| `result` | `reason` | `score` |
+|---|---|---|
+| `undeliverable` | `invalid_syntax`, `no_mail_server`, `suppressed`, `bounced_before` | 0 |
+| `risky` | `disposable` (0.2), `possible_typo` (0.3), `looks_generated` (0.4), `role` (0.5) | 0.2 to 0.5 |
+| `deliverable` | `delivered_before` (1.0), `mail_server_found` (0.9) | 0.9 to 1 |
+
+The strongest reason wins, in the order of the table. A subaddress (`joao+1@`) takes 0.1 off the score.
+
+## The signals
+
+- `did_you_mean`: the fix of a typo of a free provider.
+- `free`: Gmail, Outlook, Yahoo and other free providers.
+- `disposable`: the domain is on the list of temporary e-mail.
+- `role`: a team inbox, such as `contact@` or `noreply@`.
+- `generated`: the name looks made by a machine, as a sign-up bot makes it. The mailbox can be real.
+- `history`: what your workspace saw of this address in the last 30 days: `delivered`, `bounced` or `null`. Never the mail of another workspace.
+- `valid` and `checks`: the checks that `/send` runs.
