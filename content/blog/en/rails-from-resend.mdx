@@ -30,17 +30,20 @@ config.action_mailer.delivery_method = :resend
 bundle add 1billion
 ```
 
-Keep the `resend` gem for now. The two delivery methods live together, and the gem `1billion` adds one named `:onebillion`. Put its settings next to the others:
+Keep the `resend` gem for now: the two delivery methods live together. Then give the app its key, as you did with `RESEND_API_KEY`:
 
-```ruby
-# config/environments/production.rb
-config.action_mailer.delivery_method = :resend
-config.action_mailer.onebillion_settings = {
-  api_key: Rails.application.credentials.dig(:onebillion, :api_key)
-}
+```bash
+ONEBILLION_API_KEY=ob_...
 ```
 
-Make the API key in the [console](https://app.1billion.clowk.in), on the page of your app, and keep it in your credentials. We keep only a hash of each key: if you lose one, make a new key and revoke the old one.
+The gem reads `ONEBILLION_API_KEY` by itself, so there is no initializer to write. If you keep your keys in the Rails credentials, one line sets it:
+
+```ruby
+# config/initializers/onebillion.rb
+OneBillion.api_key = Rails.application.credentials.dig(:onebillion, :api_key)
+```
+
+Make the API key in the [console](https://app.1billion.clowk.in), on the page of your app. We keep only a hash of each key: if you lose one, make a new key and revoke the old one.
 
 ![The page of an app in the 1billion console: its API keys, its verified domain, its webhook, and the switch for role addresses.](/blog/rails-from-resend/app-keys.png)
 
@@ -108,7 +111,7 @@ end
 
 ## 6. Move the calls to the API
 
-Code that calls the Resend API directly maps one to one:
+Code that calls the Resend API directly changes one name. The fields are the same:
 
 ```ruby
 # Before
@@ -120,40 +123,34 @@ Resend::Emails.send({
 })
 
 # After
-client = OneBillion::Client.new(api_key: Rails.application.credentials.dig(:onebillion, :api_key))
-
-client.send_mail(
+OneBillion::Emails.send({
   from: "Acme <hi@acme.com>",
   to: ["jane@example.com"],
   subject: "Your receipt",
-  html: "<p>Thanks for your order.</p>",
-  idempotency_key: "receipt-#{order.id}"
-)
+  html: "<p>Thanks for your order.</p>"
+})
 ```
+
+It returns the `id` of the mail, as Resend does. A field that 1billion does not have yet raises an error that names it, so nothing is dropped without you knowing. To make a retry safe, pass a key: `OneBillion::Emails.send(params, idempotency_key: "receipt-#{order.id}")`.
 
 ## 7. Move the webhooks
 
-Resend signs its webhooks with Svix headers. 1billion sends `1B-Timestamp` and `1B-Signature`: the HMAC-SHA256 of `<timestamp>.<raw body>` with the secret of the app. The events are `delivered`, `bounced` and `unsubscribed`:
+Resend signs its webhooks with Svix headers. 1billion signs them with `1B-Timestamp` and `1B-Signature`, and the gem checks both in one call: the signature, and that the event is less than 5 minutes old.
 
 ```ruby
 class OneBillionWebhooksController < ActionController::API
   def create
-    body = request.raw_post
-    timestamp = request.headers["1B-Timestamp"].to_s
-    expected = "sha256=" + OpenSSL::HMAC.hexdigest("SHA256", Rails.application.credentials.dig(:onebillion, :webhook_secret), "#{timestamp}.#{body}")
+    event = OneBillion::Signature.verify(payload: request.raw_post, headers: request.headers)
 
-    return head :unauthorized unless ActiveSupport::SecurityUtils.secure_compare(expected, request.headers["1B-Signature"].to_s)
-    return head :unauthorized if (Time.now.to_i - timestamp.to_i).abs > 300
-
-    event = JSON.parse(body)
-
-    # event["type"], event["to"], event["message_id"]. Use event["id"] to ignore a repeat.
+    # event["type"] is delivered, bounced or unsubscribed. Use event["id"] to ignore a repeat.
     head :no_content
+  rescue OneBillion::Signature::Invalid
+    head :unauthorized
   end
 end
 ```
 
-Run both endpoints while the two services send. See [Webhooks](/docs/guides/webhooks).
+The secret comes from `ONEBILLION_WEBHOOK_SECRET`; copy it from the page of the app. Run both endpoints while the two services send. See [Webhooks](/docs/guides/webhooks).
 
 ## 8. Switch the rest, then remove Resend
 

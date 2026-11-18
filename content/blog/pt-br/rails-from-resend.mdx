@@ -30,17 +30,20 @@ config.action_mailer.delivery_method = :resend
 bundle add 1billion
 ```
 
-Mantenha o gem `resend` por enquanto. Os dois delivery methods convivem, e o gem `1billion` adiciona um chamado `:onebillion`. Coloque as configurações dele junto das outras:
+Mantenha o gem `resend` por enquanto: os dois delivery methods convivem. Depois dê a chave ao app, como você fez com o `RESEND_API_KEY`:
 
-```ruby
-# config/environments/production.rb
-config.action_mailer.delivery_method = :resend
-config.action_mailer.onebillion_settings = {
-  api_key: Rails.application.credentials.dig(:onebillion, :api_key)
-}
+```bash
+ONEBILLION_API_KEY=ob_...
 ```
 
-Crie a chave de API no [console](https://app.1billion.clowk.in), na página do seu app, e guarde nas suas credentials. Guardamos só o hash de cada chave: se perder uma, crie outra e revogue a antiga.
+O gem lê o `ONEBILLION_API_KEY` sozinho, então não há initializer para escrever. Se você guarda as chaves nas credentials do Rails, uma linha resolve:
+
+```ruby
+# config/initializers/onebillion.rb
+OneBillion.api_key = Rails.application.credentials.dig(:onebillion, :api_key)
+```
+
+Crie a chave de API no [console](https://app.1billion.clowk.in), na página do seu app. Guardamos só o hash de cada chave: se perder uma, crie outra e revogue a antiga.
 
 ![A página de um app no console do 1billion: as chaves de API, o domínio verificado, o webhook e a opção de endereços de função.](/blog/rails-from-resend/app-keys.png)
 
@@ -108,7 +111,7 @@ end
 
 ## 6. Mova as chamadas à API
 
-Código que chama a API da Resend direto tem uma troca de um para um:
+Código que chama a API da Resend direto muda um nome só. Os campos são os mesmos:
 
 ```ruby
 # Antes
@@ -120,40 +123,34 @@ Resend::Emails.send({
 })
 
 # Depois
-client = OneBillion::Client.new(api_key: Rails.application.credentials.dig(:onebillion, :api_key))
-
-client.send_mail(
+OneBillion::Emails.send({
   from: "Acme <hi@acme.com>",
   to: ["jane@example.com"],
   subject: "Seu recibo",
-  html: "<p>Obrigado pelo pedido.</p>",
-  idempotency_key: "receipt-#{order.id}"
-)
+  html: "<p>Obrigado pelo pedido.</p>"
+})
 ```
+
+Ele devolve o `id` do e-mail, como a Resend. Um campo que o 1billion ainda não tem levanta um erro com o nome dele, então nada some sem você saber. Para uma retentativa segura, passe uma chave: `OneBillion::Emails.send(params, idempotency_key: "receipt-#{order.id}")`.
 
 ## 7. Mova os webhooks
 
-A Resend assina os webhooks com headers do Svix. O 1billion envia `1B-Timestamp` e `1B-Signature`: o HMAC-SHA256 de `<timestamp>.<corpo bruto>` com o segredo do app. Os eventos são `delivered`, `bounced` e `unsubscribed`:
+A Resend assina os webhooks com headers do Svix. O 1billion assina com `1B-Timestamp` e `1B-Signature`, e o gem checa os dois numa chamada: a assinatura, e se o evento tem menos de 5 minutos.
 
 ```ruby
 class OneBillionWebhooksController < ActionController::API
   def create
-    body = request.raw_post
-    timestamp = request.headers["1B-Timestamp"].to_s
-    expected = "sha256=" + OpenSSL::HMAC.hexdigest("SHA256", Rails.application.credentials.dig(:onebillion, :webhook_secret), "#{timestamp}.#{body}")
+    event = OneBillion::Signature.verify(payload: request.raw_post, headers: request.headers)
 
-    return head :unauthorized unless ActiveSupport::SecurityUtils.secure_compare(expected, request.headers["1B-Signature"].to_s)
-    return head :unauthorized if (Time.now.to_i - timestamp.to_i).abs > 300
-
-    event = JSON.parse(body)
-
-    # event["type"], event["to"], event["message_id"]. Use event["id"] para ignorar uma repetição.
+    # event["type"] é delivered, bounced ou unsubscribed. Use event["id"] para ignorar uma repetição.
     head :no_content
+  rescue OneBillion::Signature::Invalid
+    head :unauthorized
   end
 end
 ```
 
-Deixe os dois endpoints rodando enquanto os dois serviços enviam. Veja [Webhooks](/docs/guides/webhooks).
+O segredo vem do `ONEBILLION_WEBHOOK_SECRET`; copie da página do app. Deixe os dois endpoints rodando enquanto os dois serviços enviam. Veja [Webhooks](/docs/guides/webhooks).
 
 ## 8. Troque o resto, e tire a Resend
 
