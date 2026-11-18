@@ -21,7 +21,7 @@ use serde_json::json;
 
 #[tokio::main]
 async fn main() -> Result<(), reqwest::Error> {
-    let key = std::env::var("ONEBILLION_KEY").expect("ONEBILLION_KEY is not set");
+    let key = std::env::var("ONEBILLION_API_KEY").expect("ONEBILLION_API_KEY is not set");
 
     let answer = reqwest::Client::new()
         .post("https://api.1billion.clowk.in/send")

@@ -17,7 +17,7 @@ The SDKs need nothing that Lambda does not have: the Node.js SDK uses `fetch` (N
 import { OneBillion } from "@clowk/1billion"
 
 // Outside the handler, so a warm function keeps it.
-const mail = new OneBillion(process.env.ONEBILLION_KEY, { timeoutMs: 5000 })
+const mail = new OneBillion(undefined, { timeoutMs: 5000 }) // the key of ONEBILLION_API_KEY
 
 export const handler = async (event) => {
   await mail.send({
@@ -39,7 +39,6 @@ package main
 import (
 	"context"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/aws/aws-lambda-go/lambda"
@@ -48,7 +47,7 @@ import (
 
 // Outside the handler, so a warm function keeps it.
 var client = onebillion.New(
-	os.Getenv("ONEBILLION_KEY"),
+	"", // the key of ONEBILLION_API_KEY
 	onebillion.WithHTTPClient(&http.Client{Timeout: 5 * time.Second}),
 )
 
@@ -74,4 +73,4 @@ func main() {
 }
 ```
 
-Keep `ONEBILLION_KEY` in the environment of the function, from AWS Secrets Manager or Parameter Store, never in the code.
+Keep `ONEBILLION_API_KEY` in the environment of the function, from AWS Secrets Manager or Parameter Store, never in the code.

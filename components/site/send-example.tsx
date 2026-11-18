@@ -20,7 +20,7 @@ const snippets: Snippet[] = [
     file: 'POST /send',
     lang: 'bash',
     code: `curl https://api.1billion.clowk.in/send \\
-  -H "Authorization: Bearer $ONEBILLION_KEY" \\
+  -H "Authorization: Bearer $ONEBILLION_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
     "from": "Acme <hi@acme.com>",
@@ -36,9 +36,6 @@ const snippets: Snippet[] = [
     lang: 'ruby',
     code: `# Gemfile: gem "1billion"
 config.action_mailer.delivery_method = :onebillion
-config.action_mailer.onebillion_settings = {
-  api_key: ENV["ONEBILLION_KEY"]
-}
 
 # Your mailers do not change.
 UserMailer.login_code(user, "482913").deliver_later`,
@@ -49,9 +46,9 @@ UserMailer.login_code(user, "482913").deliver_later`,
     lang: 'ts',
     code: `import { OneBillion } from "@clowk/1billion"
 
-const mail = new OneBillion(process.env.ONEBILLION_KEY)
+const mail = new OneBillion() // ONEBILLION_API_KEY
 
-await mail.send({
+await mail.emails.send({
   from: "Acme <hi@acme.com>",
   to: "jane@example.com",
   subject: "Your code",
@@ -63,9 +60,9 @@ await mail.send({
     label: 'Go',
     file: 'main.go',
     lang: 'go',
-    code: `client := onebillion.New(os.Getenv("ONEBILLION_KEY"))
+    code: `client := onebillion.New("") // ONEBILLION_API_KEY
 
-_, err := client.Send(ctx, onebillion.Mail{
+_, err := client.Emails.Send(ctx, onebillion.Mail{
 	From:     "Acme <hi@acme.com>",
 	To:       []string{"jane@example.com"},
 	Subject:  "Your code",

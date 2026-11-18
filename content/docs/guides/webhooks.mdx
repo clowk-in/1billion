@@ -43,7 +43,36 @@ Each event has three headers. Header names are not case sensitive.
 | `1B-Timestamp` | The time of the send, in Unix seconds. |
 | `1B-Signature` | `sha256=<hex>`: the HMAC-SHA256 of `<timestamp>.<raw body>` with the webhook secret of the app. |
 
-Copy the secret from the page of the app. Check the signature on the raw body, before you parse it, and refuse an old timestamp:
+Copy the secret from the page of the app, and put it in the environment as `ONEBILLION_WEBHOOK_SECRET`. Check the signature on the raw body, before you parse it, and refuse an old timestamp.
+
+### With an SDK
+
+The SDKs do all of it in one call. They read the secret from `ONEBILLION_WEBHOOK_SECRET`, refuse a timestamp older than 5 minutes, and return the event:
+
+```ruby
+class OneBillionWebhooksController < ActionController::API
+  def create
+    event = OneBillion::Signature.verify(payload: request.raw_post, headers: request.headers)
+
+    # Handle event here. Use event["id"] to ignore a repeated event.
+    head :no_content
+  rescue OneBillion::Signature::Invalid
+    head :unauthorized
+  end
+end
+```
+
+```ts
+const event = OneBillion.verifySignature({ payload: await request.text(), headers: request.headers })
+```
+
+```go
+event, err := onebillion.VerifySignature(payload, r.Header, "")
+```
+
+### Any language
+
+Make the HMAC yourself. This is the same check in Ruby, without the gem:
 
 ```ruby
 class OneBillionWebhooksController < ActionController::API

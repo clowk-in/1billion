@@ -12,8 +12,21 @@ Node.js 22 or newer, or Bun. The package is ESM only, with no dependencies.
 ```ts
 import { OneBillion, OneBillionError } from "@clowk/1billion"
 
-const mail = new OneBillion(process.env.ONEBILLION_KEY)
+const mail = new OneBillion() // the key of ONEBILLION_API_KEY
 
+const { data, error } = await mail.emails.send({
+  from: "Acme <hi@acme.com>",
+  to: "jane@example.com",
+  subject: "Your code",
+  html: "<p>Your code is <b>482 913</b></p>",
+})
+```
+
+`mail.emails.send` is the call of `resend.emails.send`: a move from Resend changes only the import and the class. Like Resend, it returns `{ data, error }` and never throws. `data` has `id` and `messages`; `error` has `name`, `message` and `statusCode`. A field that 1billion does not support (for example `tags`) gives a `validation_error` that names it.
+
+`mail.send` sends the same mail and throws a `OneBillionError`:
+
+```ts
 const { messages } = await mail.send({
   from: "Acme <hi@acme.com>",
   to: "jane@example.com",
@@ -30,13 +43,13 @@ await mail.validate("jane@gmial.com")
 
 ## Next.js
 
-Call it from a route handler or a server action. Keep `ONEBILLION_KEY` without the `NEXT_PUBLIC_` prefix, so it never goes to the browser.
+Call it from a route handler or a server action. Keep `ONEBILLION_API_KEY` without the `NEXT_PUBLIC_` prefix, so it never goes to the browser.
 
 ```ts
 // app/api/login/route.ts
 import { OneBillion } from "@clowk/1billion"
 
-const mail = new OneBillion(process.env.ONEBILLION_KEY)
+const mail = new OneBillion()
 
 export async function POST(request: Request) {
   const { email } = await request.json()
@@ -60,7 +73,7 @@ Call 1billion from your server, and let your front end call your server:
 // server: Hono, Express, a Next.js route, a SolidStart server function
 import { OneBillion } from "@clowk/1billion"
 
-const mail = new OneBillion(process.env.ONEBILLION_KEY)
+const mail = new OneBillion()
 
 app.post("/api/login-code", async c => {
   const { email } = await c.req.json()
@@ -98,9 +111,17 @@ try {
 
 | Option | Default | What |
 |---|---|---|
-| `url` | the 1billion API | another console, for example a dev stack |
+| `url` | `ONEBILLION_URL`, else the 1billion API | another console, for example a dev stack |
 | `timeoutMs` | `10000` | the timeout of each try |
 | `backoffMs` | `500` | the first wait between tries |
 | `fetch` | the global `fetch` | your own `fetch` |
+
+## Verify a webhook
+
+```ts
+const event = OneBillion.verifySignature({ payload: await request.text(), headers: request.headers })
+```
+
+It returns the event, and throws an `InvalidSignatureError` (name `invalid_signature`) for a bad signature or an old timestamp. The secret comes from `ONEBILLION_WEBHOOK_SECRET`. See [Webhooks](/docs/guides/webhooks).
 
 Source and changelog: [clowk-in/1billion-js](https://github.com/clowk-in/1billion-js).

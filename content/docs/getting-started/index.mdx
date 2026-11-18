@@ -30,7 +30,7 @@ The console checks the records for you. The domain can send when DKIM, SPF and M
 
 ### Make an API key
 
-In the app, make an API key and keep it in an environment variable, for example `ONEBILLION_KEY`. Use it only on a server: an API key must never reach a browser.
+In the app, make an API key and keep it in an environment variable, `ONEBILLION_API_KEY`. The SDKs read it from there. Use it only on a server: an API key must never reach a browser.
 
 </Step>
 <Step>
@@ -42,7 +42,7 @@ In the app, make an API key and keep it in an environment variable, for example 
 
 ```bash
 curl https://api.1billion.clowk.in/send \
-  -H "Authorization: Bearer $ONEBILLION_KEY" \
+  -H "Authorization: Bearer $ONEBILLION_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "from": "Acme <hi@acme.com>",
@@ -62,10 +62,9 @@ gem "1billion"
 
 # config/environments/production.rb
 config.action_mailer.delivery_method = :onebillion
-config.action_mailer.onebillion_settings = { api_key: ENV["ONEBILLION_KEY"] }
 ```
 
-Your mailers do not change. Send with `deliver_later`.
+That is all: the key comes from `ONEBILLION_API_KEY`. Your mailers do not change. Send with `deliver_later`.
 
 </Tab>
 <Tab value="Node.js">
@@ -73,9 +72,9 @@ Your mailers do not change. Send with `deliver_later`.
 ```ts
 import { OneBillion } from "@clowk/1billion"
 
-const mail = new OneBillion(process.env.ONEBILLION_KEY)
+const mail = new OneBillion() // the key of ONEBILLION_API_KEY
 
-await mail.send({
+const { data, error } = await mail.emails.send({
   from: "Acme <hi@acme.com>",
   to: "jane@example.com",
   subject: "Your code",
@@ -88,9 +87,9 @@ await mail.send({
 <Tab value="Go">
 
 ```go
-client := onebillion.New(os.Getenv("ONEBILLION_KEY"))
+client := onebillion.New("") // the key of ONEBILLION_API_KEY
 
-_, err := client.Send(ctx, onebillion.Mail{
+_, err := client.Emails.Send(ctx, onebillion.Mail{
 	From:     "Acme <hi@acme.com>",
 	To:       []string{"jane@example.com"},
 	Subject:  "Your code",

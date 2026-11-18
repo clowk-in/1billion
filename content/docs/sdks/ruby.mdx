@@ -1,6 +1,6 @@
 ---
 title: Ruby and Rails
-description: The gem 1billion sends from ActionMailer with one line, or from plain Ruby with OneBillion::Client.
+description: The gem 1billion sends from ActionMailer with one line, or from plain Ruby with OneBillion::Emails.send, the same call as Resend.
 ---
 
 ```bash
@@ -9,15 +9,16 @@ bundle add 1billion
 
 Ruby 3.1 or newer. The gem is named `1billion`, and its code is under `OneBillion`: a Ruby constant can not start with a digit.
 
+Put the API key in the environment as `ONEBILLION_API_KEY`. The gem reads it from there.
+
 ## Rails (ActionMailer)
 
 ```ruby
 # config/environments/production.rb
 config.action_mailer.delivery_method = :onebillion
-config.action_mailer.onebillion_settings = { api_key: ENV["ONEBILLION_KEY"] }
 ```
 
-Your mailers and views do not change:
+That is all. Your mailers and views do not change:
 
 ```ruby
 UserMailer.login_code(user, "482913").deliver_later
@@ -25,10 +26,38 @@ UserMailer.login_code(user, "482913").deliver_later
 
 The gem sends the finished MIME message to every recipient (`to`, `cc` and `bcc`), with the `Message-ID` as the `Idempotency-Key`. Send with `deliver_later`, so a slow network never holds a web request.
 
+To set the key in code, use `config.action_mailer.onebillion_settings = { api_key: ..., url: ... }`. The settings win over the environment.
+
+## Send a mail (the same call as Resend)
+
+```ruby
+answer = OneBillion::Emails.send(
+  {
+    from: "Acme <hi@acme.com>",
+    to: "jane@example.com",
+    subject: "Your code",
+    html: "<p>Your code is <b>482 913</b></p>"
+  },
+  { idempotency_key: "login-jane-482913" }
+)
+
+answer["id"] # the id of the first message; answer["messages"] has one per recipient
+```
+
+This is the call of `Resend::Emails.send`: a move from Resend changes only the constant. The keys are `from`, `to`, `cc`, `bcc`, `reply_to`, `subject`, `html`, `text`, `attachments` and `priority`. A key that 1billion does not support (for example `tags` or `scheduled_at`) raises an `ArgumentError` that names it: the gem never sends the mail without it.
+
+## Verify a webhook
+
+```ruby
+event = OneBillion::Signature.verify(payload: request.raw_post, headers: request.headers)
+```
+
+It returns the event as a Hash, and raises `OneBillion::Signature::Invalid` for a bad signature or an old timestamp. The secret comes from `ONEBILLION_WEBHOOK_SECRET`. See [Webhooks](/docs/guides/webhooks).
+
 ## The client
 
 ```ruby
-client = OneBillion::Client.new(api_key: ENV["ONEBILLION_KEY"])
+client = OneBillion::Client.new # the key of ONEBILLION_API_KEY
 
 client.send_mail(
   from: "Acme <hi@acme.com>",
@@ -62,7 +91,8 @@ end
 
 | Option | Default | What |
 |---|---|---|
-| `url:` | the 1billion API | another console, for example a dev stack |
+| `api_key:` | `ENV["ONEBILLION_API_KEY"]` | the API key of the app |
+| `url:` | `ENV["ONEBILLION_URL"]`, else the 1billion API | another console, for example a dev stack |
 | `timeout:` | `10` | seconds for each try |
 | `backoff:` | `0.5` | the first wait between tries, in seconds |
 

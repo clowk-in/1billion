@@ -10,9 +10,9 @@ go get github.com/clowk-in/1billion-go
 Go 1.24 or newer. The package name is `onebillion`: a Go name can not start with a digit.
 
 ```go
-client := onebillion.New(os.Getenv("ONEBILLION_KEY"))
+client := onebillion.New("") // the key of ONEBILLION_API_KEY
 
-out, err := client.Send(ctx, onebillion.Mail{
+out, err := client.Emails.Send(ctx, onebillion.Mail{
 	From:     "Acme <hi@acme.com>",
 	To:       []string{"jane@example.com"},
 	Subject:  "Your code",
@@ -24,6 +24,18 @@ msg, err := client.Message(ctx, out.Messages[0].ID)
 err = client.Unsuppress(ctx, "jane@example.com")
 v, err := client.Validate(ctx, "jane@gmial.com")
 ```
+
+`client.Emails.Send` is the same call as `client.Send`. An empty key reads `ONEBILLION_API_KEY`.
+
+## Verify a webhook
+
+```go
+payload, _ := io.ReadAll(r.Body)
+
+event, err := onebillion.VerifySignature(payload, r.Header, "")
+```
+
+An empty secret reads `ONEBILLION_WEBHOOK_SECRET`. A bad signature or a timestamp more than 5 minutes old gives an error that matches `onebillion.ErrInvalidSignature`. See [Webhooks](/docs/guides/webhooks).
 
 ## Errors
 
@@ -42,7 +54,7 @@ case err != nil:
 
 | Option | Default | What |
 |---|---|---|
-| `WithURL` | the 1billion API | another console, for example a dev stack |
+| `WithURL` | `ONEBILLION_URL`, else the 1billion API | another console, for example a dev stack |
 | `WithHTTPClient` | a client with a 10 s timeout | your own `*http.Client` |
 | `WithBackoff` | 500 ms | the first wait between tries |
 
