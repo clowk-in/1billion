@@ -6,7 +6,7 @@ import { site } from '@/lib/site';
 // The version of the share images. Bump it after `node scripts/og.mjs`, so
 // Facebook, LinkedIn, WhatsApp, Slack and X fetch the new file instead of
 // the one they keep in their cache.
-const v = 3;
+const v = 4;
 
 const alts: Record<Locale, string> = {
   en: '1billion: the mail your users wait for, in the inbox. Free forever: 100,000 credits every day.',

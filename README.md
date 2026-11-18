@@ -1,7 +1,11 @@
 <p align="center">
-  <a href="https://1billion.clowk.in"><img src="public/brand/logo-color.svg" alt="1billion" height="56"></a>
+  <a href="https://1billion.clowk.in">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="public/brand/logo-white.svg">
+      <img src="public/brand/logo-color.svg" alt="1billion" height="64">
+    </picture>
+  </a>
 </p>
-
 <p align="center">
   <b>Transactional e-mail on its own sending servers.</b><br>
   Free forever: 100,000 credits every day.

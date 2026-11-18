@@ -152,7 +152,7 @@ function Cover({ entry }: { entry: Post }) {
     <div
       className={`relative flex flex-col items-center justify-center gap-4 overflow-hidden bg-[radial-gradient(ellipse_at_50%_30%,rgba(185,162,255,0.35),transparent_60%),linear-gradient(135deg,#2a1268_0%,#4320ad_55%,#6a35e6_100%)] p-6 ${frame}`}
     >
-      <img src="/brand/bila-white.svg" alt="" width={96} height={80} />
+      <img src="/brand/bila-white.svg" alt="" width={96} height={75} />
 
       <span className={`max-w-md text-center font-display font-extrabold leading-[1.08] tracking-[-0.03em] text-white text-[26px]`}>
         {entry.title}
