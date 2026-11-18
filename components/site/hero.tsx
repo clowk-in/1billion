@@ -77,8 +77,8 @@ function Stats({ stats }: { stats: { value: string; label: string }[] }) {
   return (
     <div className="mx-auto mt-2 grid max-w-6xl grid-cols-1 gap-3 rounded-2xl border border-line bg-panel px-6 py-5 sm:grid-cols-3">
       {stats.map(stat => (
-        <div key={stat.label} className="flex items-baseline justify-center gap-3">
-          <span className="font-display text-[30px] font-bold tracking-[-0.03em] text-ink">{stat.value}</span>
+        <div key={stat.label} className="flex items-baseline gap-3 sm:justify-center">
+          <span className="flex-none whitespace-nowrap font-display text-[30px] font-bold tracking-[-0.03em] text-ink">{stat.value}</span>
 
           <span className="font-mono text-[12px] uppercase tracking-[0.14em] text-sub">{stat.label}</span>
         </div>

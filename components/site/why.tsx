@@ -23,18 +23,18 @@ export function Why({ locale }: { locale: Locale }) {
   ];
 
   return (
-    <section className="mx-auto w-full max-w-6xl px-4 py-24 md:px-6 md:py-32">
+    <section className="mx-auto w-full max-w-6xl px-4 py-14 md:px-6 md:py-32">
       <div className="mx-auto flex max-w-2xl flex-col items-center gap-4 text-center">
         <p className="font-mono text-[13px] font-medium uppercase tracking-[0.16em] text-brandtext">{t.eyebrow}</p>
 
-        <h2 className="font-display text-[38px] font-extrabold leading-tight tracking-[-0.035em] text-ink md:text-[56px]">
+        <h2 className="font-display text-[30px] font-extrabold leading-tight tracking-[-0.035em] text-ink md:text-[56px]">
           {t.title}
         </h2>
 
-        <p className="text-[17px] leading-relaxed text-sub md:text-[19px]">{t.text}</p>
+        <p className="text-[16px] leading-relaxed text-sub md:text-[19px]">{t.text}</p>
       </div>
 
-      <div className="mt-16 flex flex-col">
+      <div className="mt-8 flex flex-col md:mt-16">
         {t.rows.map((row, index) => (
           <WhyRow
             key={row.eyebrow}
@@ -64,7 +64,7 @@ function WhyRow({ eyebrow, title, text, tone, visual, last }: RowProps) {
   const border = last ? '' : 'border-b border-line';
 
   return (
-    <div className={`grid grid-cols-1 items-center gap-10 py-14 lg:grid-cols-2 lg:gap-16 ${border}`}>
+    <div className={`grid grid-cols-1 items-center gap-6 py-10 md:gap-10 md:py-14 lg:grid-cols-2 lg:gap-16 ${border}`}>
       <div className="flex min-w-0 flex-col gap-4">
         <p className={`font-mono text-[13px] font-medium uppercase tracking-[0.16em] ${tone}`}>{eyebrow}</p>
 

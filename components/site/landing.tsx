@@ -88,9 +88,9 @@ export function Landing({ locale }: { locale: Locale }) {
       <main className="flex-1" lang={htmlLang[locale]}>
         <Hero locale={locale} />
 
-        <Why locale={locale} />
-
         <SendExample locale={locale} />
+
+        <Why locale={locale} />
 
         <Runtimes locale={locale} />
 

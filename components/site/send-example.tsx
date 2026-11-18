@@ -100,15 +100,15 @@ export async function SendExample({ locale }: { locale: Locale }) {
 
   return (
     <section className="border-t border-line">
-      <div className="mx-auto w-full max-w-6xl px-4 py-24 md:px-6 md:py-32">
+      <div className="mx-auto w-full max-w-6xl px-4 py-14 md:px-6 md:py-32">
         <div className="mx-auto flex max-w-2xl flex-col items-center gap-4 text-center">
           <p className="font-mono text-[13px] font-medium uppercase tracking-[0.16em] text-brandtext">{t.eyebrow}</p>
 
-          <h2 className="font-display text-[38px] font-extrabold leading-tight tracking-[-0.035em] text-ink md:text-[56px]">
+          <h2 className="font-display text-[30px] font-extrabold leading-tight tracking-[-0.035em] text-ink md:text-[56px]">
             {t.title}
           </h2>
 
-          <p className="text-[17px] leading-relaxed text-sub md:text-[19px]">{t.text}</p>
+          <p className="text-[16px] leading-relaxed text-sub md:text-[19px]">{t.text}</p>
 
           <Link
             href="/docs/sdks"
@@ -119,7 +119,7 @@ export async function SendExample({ locale }: { locale: Locale }) {
           </Link>
         </div>
 
-        <div className="mt-14">
+        <div className="mt-8 md:mt-14">
           <CodeTabs tabs={tabs} response={response} responseLabel={t.response} />
         </div>
       </div>
