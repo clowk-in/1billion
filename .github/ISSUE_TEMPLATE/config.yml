@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security problem
+    url: https://github.com/clowk-in/1billion/security/advisories/new
+    about: Report security problems in private, not in a public issue.
+  - name: A problem with an SDK
+    url: https://github.com/clowk-in/1billion-ruby/issues
+    about: The SDKs have repositories of their own (Ruby, JS, Go). Open the issue there.
