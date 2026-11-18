@@ -54,30 +54,38 @@ event = OneBillion::Signature.verify(payload: request.raw_post, headers: request
 
 It returns the event as a Hash, and raises `OneBillion::Signature::Invalid` for a bad signature or an old timestamp. The secret comes from `ONEBILLION_WEBHOOK_SECRET`. See [Webhooks](/docs/guides/webhooks).
 
-## The client
+## Read, validate, unsuppress
+
+`OneBillion.client` is a client with the key of `ONEBILLION_API_KEY`, ready to use:
 
 ```ruby
-client = OneBillion::Client.new # the key of ONEBILLION_API_KEY
+OneBillion.client.message("9f2c…")
+OneBillion.client.validate("jane@gmial.com")
+OneBillion.client.unsuppress("jane@example.com")
+```
 
-client.send_mail(
-  from: "Acme <hi@acme.com>",
+## More than one key
+
+`OneBillion::Emails.send` uses one key for the whole process. To send for two apps from one process, make a
+client for each. `send_mail` takes the same keys as `Emails.send`, and also `raw`, a finished MIME message:
+
+```ruby
+billing = OneBillion::Client.new(api_key: ENV["BILLING_ONEBILLION_API_KEY"])
+
+billing.send_mail(
+  from: "Acme Billing <billing@acme.com>",
   to: ["jane@example.com"],
-  subject: "Your code",
-  text: "Your code is 482 913",
-  priority: "high",
-  idempotency_key: "login-jane-482913"
+  subject: "Your receipt",
+  html: "<p>Thanks for your order.</p>",
+  idempotency_key: "receipt-8812"
 )
-
-client.message("9f2c…")
-client.unsuppress("jane@example.com")
-client.validate("jane@gmial.com")
 ```
 
 ## Errors
 
 ```ruby
 begin
-  client.send_mail(**mail)
+  OneBillion::Emails.send(mail)
 rescue OneBillion::NoCredits => error
   # 429: error.body["retry_after"], error.body["buy_url"]
 rescue OneBillion::Refused => error
