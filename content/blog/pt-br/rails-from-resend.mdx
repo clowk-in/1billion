@@ -40,7 +40,8 @@ O gem lê o `ONEBILLION_API_KEY` sozinho, então não há initializer para escre
 
 ```ruby
 # config/initializers/onebillion.rb
-OneBillion.api_key = Rails.application.credentials.dig(:onebillion, :api_key)
+OneBillion.api_key =
+  Rails.application.credentials.dig(:onebillion, :api_key)
 ```
 
 Crie a chave de API no [console](https://app.1billion.clowk.in), na página do seu app. Guardamos só o hash de cada chave: se perder uma, crie outra e revogue a antiga.
@@ -96,14 +97,17 @@ O gem já tenta de novo num `503` ou num erro de rede, 3 vezes, com a mesma chav
 ```ruby
 # config/initializers/onebillion.rb
 Rails.application.config.after_initialize do
-  # O serviço ficou fora mais tempo do que o gem espera: tente depois.
-  ActionMailer::MailDeliveryJob.retry_on OneBillion::Error, wait: :polynomially_longer, attempts: 10
+  job = ActionMailer::MailDeliveryJob
 
-  # Sem créditos hoje: eles voltam à meia-noite, no fuso do workspace.
-  ActionMailer::MailDeliveryJob.retry_on OneBillion::NoCredits, wait: 1.hour, attempts: 24
+  # Fora do ar mais tempo do que o gem espera: tente depois.
+  job.retry_on OneBillion::Error,
+    wait: :polynomially_longer, attempts: 10
 
-  # Mensagem ruim ou destinatário que falhou numa checagem: repetir dá a mesma resposta.
-  ActionMailer::MailDeliveryJob.discard_on OneBillion::Refused
+  # Sem créditos hoje: eles voltam à meia-noite.
+  job.retry_on OneBillion::NoCredits, wait: 1.hour, attempts: 24
+
+  # Mensagem ou destinatário ruim: repetir dá a mesma resposta.
+  job.discard_on OneBillion::Refused
 end
 ```
 
@@ -140,9 +144,13 @@ A Resend assina os webhooks com headers do Svix. O 1billion assina com `1B-Times
 ```ruby
 class OneBillionWebhooksController < ActionController::API
   def create
-    event = OneBillion::Signature.verify(payload: request.raw_post, headers: request.headers)
+    event = OneBillion::Signature.verify(
+      payload: request.raw_post,
+      headers: request.headers
+    )
 
-    # event["type"] é delivered, bounced ou unsubscribed. Use event["id"] para ignorar uma repetição.
+    # event["type"]: delivered, bounced ou unsubscribed.
+    # Use event["id"] para ignorar um evento repetido.
     head :no_content
   rescue OneBillion::Signature::Invalid
     head :unauthorized

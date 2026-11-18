@@ -40,7 +40,8 @@ The gem reads `ONEBILLION_API_KEY` by itself, so there is no initializer to writ
 
 ```ruby
 # config/initializers/onebillion.rb
-OneBillion.api_key = Rails.application.credentials.dig(:onebillion, :api_key)
+OneBillion.api_key =
+  Rails.application.credentials.dig(:onebillion, :api_key)
 ```
 
 Make the API key in the [console](https://app.1billion.clowk.in), on the page of your app. We keep only a hash of each key: if you lose one, make a new key and revoke the old one.
@@ -96,14 +97,17 @@ The gem already tries again on a `503` or a network error, 3 times, with the sam
 ```ruby
 # config/initializers/onebillion.rb
 Rails.application.config.after_initialize do
-  # The service was down for longer than the gem waits: try later.
-  ActionMailer::MailDeliveryJob.retry_on OneBillion::Error, wait: :polynomially_longer, attempts: 10
+  job = ActionMailer::MailDeliveryJob
 
-  # No credits today: they come back at midnight in the time zone of the workspace.
-  ActionMailer::MailDeliveryJob.retry_on OneBillion::NoCredits, wait: 1.hour, attempts: 24
+  # Down for longer than the gem waits: try again later.
+  job.retry_on OneBillion::Error,
+    wait: :polynomially_longer, attempts: 10
 
-  # A bad message or a recipient that failed a check: a retry gives the same answer.
-  ActionMailer::MailDeliveryJob.discard_on OneBillion::Refused
+  # No credits today: they come back at midnight.
+  job.retry_on OneBillion::NoCredits, wait: 1.hour, attempts: 24
+
+  # A bad message or recipient: a retry gives the same answer.
+  job.discard_on OneBillion::Refused
 end
 ```
 
@@ -140,9 +144,13 @@ Resend signs its webhooks with Svix headers. 1billion signs them with `1B-Timest
 ```ruby
 class OneBillionWebhooksController < ActionController::API
   def create
-    event = OneBillion::Signature.verify(payload: request.raw_post, headers: request.headers)
+    event = OneBillion::Signature.verify(
+      payload: request.raw_post,
+      headers: request.headers
+    )
 
-    # event["type"] is delivered, bounced or unsubscribed. Use event["id"] to ignore a repeat.
+    # event["type"]: delivered, bounced or unsubscribed.
+    # Use event["id"] to ignore a repeated event.
     head :no_content
   rescue OneBillion::Signature::Invalid
     head :unauthorized
