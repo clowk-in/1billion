@@ -1,0 +1,137 @@
+---
+title: Envie e-mail com Bun, Hono e React usando o 1billion
+description: Um formulário React envia para uma rota Hono no Bun, e a rota envia um e-mail de boas-vindas com o SDK de JavaScript. A API key nunca sai do servidor.
+date: '2026-11-18T21:30:00Z'
+author: Thadeu Esteves
+cover: /blog/bun-hono-react/cover.png
+---
+
+Este post monta um cadastro simples: um formulário React, uma API Hono no Bun, e um e-mail de boas-vindas enviado com o `@clowk/1billion`. O SDK usa só `fetch`, então roda no Bun sem pacotes extras.
+
+A regra do post inteiro: **o app React nunca vê a API key.** O navegador chama a sua rota Hono, e a rota chama o 1billion.
+
+```
+Formulário React ──► POST /api/signup (Hono no Bun) ──► 1billion ──► caixa de entrada
+```
+
+## 1. Instale
+
+```bash
+bun add hono @clowk/1billion
+```
+
+Crie uma API key no [console](https://app.1billion.clowk.in), verifique o domínio de onde você envia, e coloque a chave no `.env`. O Bun lê o `.env` sozinho:
+
+```bash
+ONEBILLION_API_KEY=<sua API key>
+```
+
+## 2. A rota Hono
+
+```ts
+// server/index.ts
+import { Hono } from "hono"
+import { OneBillion, OneBillionError } from "@clowk/1billion"
+
+const app = new Hono()
+const mail = new OneBillion() // lê ONEBILLION_API_KEY
+
+app.post("/api/signup", async c => {
+  const { email, name } = await c.req.json<{ email: string; name: string }>()
+
+  try {
+    await mail.send({
+      from: "Acme <hi@acme.com>",
+      to: email,
+      subject: `Bem-vindo, ${name}`,
+      html: `<p>Oi ${name}, a sua conta está pronta.</p>`,
+      idempotencyKey: `welcome-${email}`,
+    })
+  } catch (error) {
+    if (error instanceof OneBillionError && error.refused) {
+      return c.json({ error: "Não conseguimos enviar para este endereço." }, 422)
+    }
+
+    throw error
+  }
+
+  return c.json({ ok: true })
+})
+
+export default app
+```
+
+Rode com `bun run server/index.ts`. O Bun serve o export default do arquivo.
+
+Algumas notas:
+
+- O `send` retorna quando o 1billion tem o e-mail (`202`). A entrega roda depois, então a rota responde rápido.
+- O `idempotencyKey` deixa o clique duplo seguro: a mesma chave em 30 dias não envia nada de novo.
+- `error.refused` é um `422`: mensagem inválida, domínio não verificado, ou endereço que falhou numa checagem. Mostre uma mensagem clara para o usuário.
+
+## 3. O formulário React
+
+```tsx
+// web/SignUp.tsx
+import { useState } from "react"
+
+export function SignUp() {
+  const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle")
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setState("sending")
+
+    const form = new FormData(event.currentTarget)
+
+    const response = await fetch("/api/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: form.get("name"), email: form.get("email") }),
+    })
+
+    setState(response.ok ? "sent" : "error")
+  }
+
+  if (state === "sent") return <p>Confira a sua caixa de entrada.</p>
+
+  return (
+    <form onSubmit={submit}>
+      <input name="name" placeholder="Seu nome" required />
+      <input name="email" type="email" placeholder="voce@exemplo.com" required />
+
+      <button disabled={state === "sending"}>Cadastrar</button>
+
+      {state === "error" && <p>Não conseguimos enviar o e-mail. Tente de novo.</p>}
+    </form>
+  )
+}
+```
+
+O formulário envia JSON para `/api/signup` no mesmo host. Em desenvolvimento, aponte o dev server do seu app React (por exemplo o Vite) para a porta do Hono com um proxy.
+
+## 4. Verifique o webhook
+
+Adicione mais uma rota para saber quando um e-mail volta (bounce):
+
+```ts
+app.post("/webhooks/1billion", async c => {
+  try {
+    const event = OneBillion.verifySignature({ payload: await c.req.text(), headers: c.req.raw.headers })
+
+    if (event.type === "bounced") await markBounced(event.to)
+
+    return c.body(null, 200)
+  } catch {
+    return c.body(null, 401)
+  }
+})
+```
+
+Leia o body cru com `c.req.text()`: um body convertido e transformado em JSON de novo não bate com a assinatura. O segredo vem de `ONEBILLION_WEBHOOK_SECRET`.
+
+A referência completa está no [README do SDK](https://github.com/clowk-in/1billion-js).
+
+## Comece agora
+
+Os primeiros 100 e-mails de cada dia são grátis, todo dia: cada workspace recebe 100.000 créditos à meia-noite, sem cartão. [Entre no console](https://app.1billion.clowk.in), adicione o seu domínio e envie o seu primeiro e-mail em poucos minutos com o [quickstart](/docs/getting-started).

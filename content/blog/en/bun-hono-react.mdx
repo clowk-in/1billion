@@ -1,0 +1,137 @@
+---
+title: Send e-mail from Bun, Hono and React with 1billion
+description: A React form posts to a Hono route on Bun, and the route sends a welcome mail with the JavaScript SDK. The API key never leaves the server.
+date: '2026-11-18T21:30:00Z'
+author: Thadeu Esteves
+cover: /blog/bun-hono-react/cover.png
+---
+
+This post builds a small sign-up: a React form, a Hono API on Bun, and a welcome mail sent with `@clowk/1billion`. The SDK uses only `fetch`, so it runs on Bun with no extra packages.
+
+The rule for the whole post: **the React app never sees the API key.** The browser calls your Hono route, and the route calls 1billion.
+
+```
+React form ──► POST /api/signup (Hono on Bun) ──► 1billion ──► inbox
+```
+
+## 1. Install
+
+```bash
+bun add hono @clowk/1billion
+```
+
+Make an API key in the [console](https://app.1billion.clowk.in), verify the domain that you send from, and put the key in `.env`. Bun reads `.env` by itself:
+
+```bash
+ONEBILLION_API_KEY=<your API key>
+```
+
+## 2. The Hono route
+
+```ts
+// server/index.ts
+import { Hono } from "hono"
+import { OneBillion, OneBillionError } from "@clowk/1billion"
+
+const app = new Hono()
+const mail = new OneBillion() // reads ONEBILLION_API_KEY
+
+app.post("/api/signup", async c => {
+  const { email, name } = await c.req.json<{ email: string; name: string }>()
+
+  try {
+    await mail.send({
+      from: "Acme <hi@acme.com>",
+      to: email,
+      subject: `Welcome, ${name}`,
+      html: `<p>Hi ${name}, your account is ready.</p>`,
+      idempotencyKey: `welcome-${email}`,
+    })
+  } catch (error) {
+    if (error instanceof OneBillionError && error.refused) {
+      return c.json({ error: "We can not send to this address." }, 422)
+    }
+
+    throw error
+  }
+
+  return c.json({ ok: true })
+})
+
+export default app
+```
+
+Run it with `bun run server/index.ts`. Bun serves the default export of the file.
+
+Some notes:
+
+- `send` returns when 1billion has the mail (`202`). The delivery runs after that, so the route answers fast.
+- `idempotencyKey` makes a double click safe: the same key in 30 days sends nothing again.
+- `error.refused` is a `422`: a bad message, a domain that is not verified, or an address that failed a check. Show a clear message to the user.
+
+## 3. The React form
+
+```tsx
+// web/SignUp.tsx
+import { useState } from "react"
+
+export function SignUp() {
+  const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle")
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setState("sending")
+
+    const form = new FormData(event.currentTarget)
+
+    const response = await fetch("/api/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: form.get("name"), email: form.get("email") }),
+    })
+
+    setState(response.ok ? "sent" : "error")
+  }
+
+  if (state === "sent") return <p>Check your inbox.</p>
+
+  return (
+    <form onSubmit={submit}>
+      <input name="name" placeholder="Your name" required />
+      <input name="email" type="email" placeholder="you@example.com" required />
+
+      <button disabled={state === "sending"}>Sign up</button>
+
+      {state === "error" && <p>We could not send the mail. Try again.</p>}
+    </form>
+  )
+}
+```
+
+The form posts JSON to `/api/signup` on the same host. In development, point the dev server of your React app (for example Vite) to the Hono port with a proxy.
+
+## 4. Verify the webhook
+
+Add one more route to know when a mail bounces:
+
+```ts
+app.post("/webhooks/1billion", async c => {
+  try {
+    const event = OneBillion.verifySignature({ payload: await c.req.text(), headers: c.req.raw.headers })
+
+    if (event.type === "bounced") await markBounced(event.to)
+
+    return c.body(null, 200)
+  } catch {
+    return c.body(null, 401)
+  }
+})
+```
+
+Read the raw body with `c.req.text()`: a body parsed and made into JSON again does not match the signature. The secret comes from `ONEBILLION_WEBHOOK_SECRET`.
+
+The full reference is in the [README of the SDK](https://github.com/clowk-in/1billion-js).
+
+## Start now
+
+The first 100 mails of each day are free, every day: each workspace gets 100,000 credits at midnight, with no card. [Log in to the console](https://app.1billion.clowk.in), add your domain, and send your first mail in a few minutes with the [quickstart](/docs/getting-started).

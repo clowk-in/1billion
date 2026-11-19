@@ -1,0 +1,67 @@
+---
+title: MUA, MSA, MTA e MDA, e onde o 1billion se encaixa
+description: Os quatro agentes que levam um e-mail de uma pessoa a outra, o que cada um faz, e quais partes o 1billion roda hoje e as próximas.
+date: '2026-11-18T21:00:00Z'
+author: Thadeu Esteves
+cover: /blog/mua-msa-mta-mda/cover.png
+---
+
+Um e-mail não vai do seu app até a caixa de entrada em um passo só. Quatro agentes levam a mensagem, e cada um tem uma função. Os nomes são parecidos, então é fácil confundir. Este post explica cada um e mostra quais partes o 1billion roda.
+
+## Os quatro agentes
+
+| Agente | Nome | O que faz |
+|---|---|---|
+| **MUA** | Mail User Agent | O app onde a pessoa escreve e lê e-mails: Outlook, Thunderbird, Apple Mail, um webmail. |
+| **MSA** | Mail Submission Agent | Recebe a mensagem do MUA, valida quem envia e se tem permissão, e entrega ao MTA. Normalmente na porta 587. |
+| **MTA** | Mail Transfer Agent | Transporta a mensagem de servidor em servidor via SMTP, até chegar ao servidor do destinatário. |
+| **MDA** | Mail Delivery Agent | Coloca a mensagem na caixa postal do destinatário, onde o MUA dele pode ler. |
+
+## O caminho de uma mensagem
+
+```
+Você escreve ──► MUA ──► MSA ──► MTA ──► (SMTP) ──► MTA ──► MDA ──► MUA ──► Ele lê
+                seu app  valida  envia               recebe   guarda  app dele
+```
+
+1. **MUA.** Você escreve a mensagem e clica em enviar.
+2. **MSA.** O MUA conecta no MSA, normalmente na porta 587 com STARTTLS, e faz login. O MSA confere o login, confere se você pode usar o endereço do `From` e corrige pequenos erros nos headers. Um login errado para aqui.
+3. **MTA.** O MTA consulta os registros MX do domínio do destinatário, assina a mensagem com DKIM e abre uma conexão SMTP com o servidor do outro lado. Se esse servidor responde "tente depois", o MTA guarda a mensagem na fila e tenta de novo.
+4. **MDA.** Do lado do destinatário, o MDA coloca a mensagem na caixa certa. Ele também pode rodar filtros, por exemplo mover spam para uma pasta.
+5. **MUA.** O destinatário abre o app de e-mail e lê.
+
+Por que o MSA não é o MTA? A porta 25 é para servidor falar com servidor, e muitas redes bloqueiam essa porta para usuários comuns. O MSA dá a pessoas e apps uma porta própria, com login, e assim o MTA não precisa confiar em qualquer um que conecta.
+
+## Onde o 1billion se encaixa
+
+### Hoje: o MTA, atrás de uma API
+
+O 1billion roda o seu próprio MTA. Quando o seu app chama `POST /send`, o 1billion assume do passo 3 em diante, do lado de quem envia:
+
+- Aceita o e-mail e responde `202` na hora.
+- Assina com a chave DKIM do seu domínio.
+- Encontra o MX de cada destinatário e envia via SMTP.
+- Tenta de novo quando um servidor pede para esperar, e avisa o que aconteceu com cada destinatário por webhook (`delivered`, `bounced` e outros).
+
+Nesse modelo, a API HTTP faz o papel de um MSA: a sua API key é o login, e a verificação do seu domínio é a verificação do endereço do `From`. O seu app é o MUA. Os SDKs ([Ruby](https://github.com/clowk-in/1billion-ruby), [Go](https://github.com/clowk-in/1billion-go), [JavaScript](https://github.com/clowk-in/1billion-js)) deixam tudo em uma chamada.
+
+### Próximo passo: um MSA
+
+Nem todo app consegue chamar uma API HTTP. Um sistema legado, uma impressora, um plugin de WordPress ou uma ferramenta que só conhece "host SMTP, porta, usuário, senha" precisa de um MSA. Estamos preparando o MSA do 1billion, para que esses apps enviem via SMTP e tenham o mesmo DKIM, as mesmas tentativas e os mesmos webhooks da API. Vamos avisar aqui quando estiver no ar.
+
+### Fora do nosso papel: o MDA e o MUA
+
+O 1billion envia e-mail. O MDA e o MUA ficam do lado do destinatário: Gmail, Outlook e outros provedores de caixa postal rodam essas partes. Não guardamos caixas postais e não fazemos um app de e-mail.
+
+## Resumo
+
+- **MUA** escreve e lê.
+- **MSA** valida e aceita.
+- **MTA** transporta.
+- **MDA** guarda.
+
+Hoje o 1billion é o MTA, com uma API como porta de entrada. A porta SMTP, o MSA, vem a seguir.
+
+## Comece agora
+
+Os primeiros 100 e-mails de cada dia são grátis, todo dia: cada workspace recebe 100.000 créditos à meia-noite, sem cartão. [Entre no console](https://app.1billion.clowk.in), adicione o seu domínio e envie o seu primeiro e-mail em poucos minutos com o [quickstart](/docs/getting-started).

@@ -1,0 +1,138 @@
+---
+title: Send e-mail from Next.js with 1billion
+description: Send a login link from a Next.js route handler or a server action with the JavaScript SDK, and verify the webhooks that come back.
+date: '2026-11-18T21:10:00Z'
+author: Thadeu Esteves
+cover: /blog/nextjs/cover.png
+---
+
+This post sends a login link from a Next.js app (App Router) with `@clowk/1billion`, the JavaScript SDK of 1billion. It has no dependencies: it uses only `fetch`.
+
+## 1. Install and set the key
+
+```bash
+pnpm add @clowk/1billion
+```
+
+Make an API key in the [console](https://app.1billion.clowk.in) and verify the domain that you send from. Then put the key in `.env.local`:
+
+```bash
+ONEBILLION_API_KEY=<your API key>
+```
+
+Do not use the `NEXT_PUBLIC_` prefix. The key must stay on the server, and the SDK has no browser build.
+
+## 2. One client for the app
+
+```ts
+// lib/mail.ts
+import { OneBillion } from "@clowk/1billion"
+
+export const mail = new OneBillion() // reads ONEBILLION_API_KEY
+```
+
+## 3. Send from a route handler
+
+```ts
+// app/api/login/route.ts
+import { mail } from "@/lib/mail"
+
+export async function POST(request: Request) {
+  const { email } = await request.json()
+
+  await mail.send({
+    from: "Acme <hi@acme.com>",
+    to: email,
+    subject: "Your login link",
+    html: `<a href="https://acme.com/login?token=…">Log in</a>`,
+    priority: "high",
+  })
+
+  return Response.json({ ok: true })
+}
+```
+
+`send` returns when 1billion has the mail (`202`, status `accepted`). The delivery runs after that, with its own retries. `priority: "high"` puts mail that a person waits for, such as a code or a login link, first.
+
+## 4. Or from a server action
+
+```ts
+// app/login/actions.ts
+"use server"
+
+import { mail } from "@/lib/mail"
+
+export async function sendLoginLink(formData: FormData) {
+  const email = String(formData.get("email"))
+
+  const { error } = await mail.emails.send({
+    from: "Acme <hi@acme.com>",
+    to: email,
+    subject: "Your login link",
+    html: `<a href="https://acme.com/login?token=…">Log in</a>`,
+  })
+
+  if (error) return { error: error.message }
+
+  return { ok: true }
+}
+```
+
+`emails.send` is the call of `resend.emails.send`. It returns `{ data, error }` and never throws, which fits a server action that returns a state to the form. If you come from Resend, only the import and the class change.
+
+## 5. Send each mail once
+
+A user clicks twice, or your code retries. Give the mail an idempotency key that names it:
+
+```ts
+await mail.send({ ...message, idempotencyKey: `login-${userId}-${token}` })
+```
+
+The same key in 30 days returns the first answer and sends nothing again. The SDK also retries a `503` or a network error with the same key, so its own retries never send a mail twice.
+
+## 6. Handle the errors
+
+```ts
+import { OneBillionError } from "@clowk/1billion"
+
+try {
+  await mail.send(message)
+} catch (error) {
+  if (!(error instanceof OneBillionError)) throw error
+
+  if (error.noCredits) {
+    // 429: no credits for these recipients today
+  } else if (error.refused) {
+    // 422: a bad message, a domain that is not verified, or a recipient that failed a check
+  }
+}
+```
+
+## 7. Verify the webhook
+
+1billion tells you what happened to each recipient. Read the raw body, then verify the signature:
+
+```ts
+// app/api/webhooks/1billion/route.ts
+import { OneBillion } from "@clowk/1billion"
+
+export async function POST(request: Request) {
+  try {
+    const event = OneBillion.verifySignature({ payload: await request.text(), headers: request.headers })
+
+    if (event.type === "bounced") await markBounced(event.to)
+
+    return new Response(null, { status: 200 })
+  } catch {
+    return new Response(null, { status: 401 })
+  }
+}
+```
+
+The secret comes from `ONEBILLION_WEBHOOK_SECRET`. A bad signature, or a timestamp older than 5 minutes, throws.
+
+That is all. The full reference is in the [README of the SDK](https://github.com/clowk-in/1billion-js).
+
+## Start now
+
+The first 100 mails of each day are free, every day: each workspace gets 100,000 credits at midnight, with no card. [Log in to the console](https://app.1billion.clowk.in), add your domain, and send your first mail in a few minutes with the [quickstart](/docs/getting-started).

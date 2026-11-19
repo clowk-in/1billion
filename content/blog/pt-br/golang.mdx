@@ -1,0 +1,117 @@
+---
+title: Envie e-mail do Go com o 1billion
+description: Envie um recibo de um serviço Go com o SDK oficial, com tentativas seguras, erros claros e webhook verificado. Só a biblioteca padrão.
+date: '2026-11-18T21:20:00Z'
+author: Thadeu Esteves
+cover: /blog/golang/cover.png
+---
+
+Este post envia e-mail de um serviço Go com o `github.com/clowk-in/1billion-go`. O SDK usa só a biblioteca padrão do Go.
+
+## 1. Instale e configure a chave
+
+```bash
+go get github.com/clowk-in/1billion-go
+```
+
+Precisa do Go 1.24 ou mais novo. O nome do pacote é `onebillion`, porque um nome em Go não pode começar com dígito.
+
+Crie uma API key no [console](https://app.1billion.clowk.in), verifique o domínio de onde você envia, e coloque a chave no ambiente:
+
+```bash
+export ONEBILLION_API_KEY=<sua API key>
+```
+
+## 2. Envie um e-mail
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+
+	onebillion "github.com/clowk-in/1billion-go"
+)
+
+func main() {
+	client := onebillion.New("") // lê ONEBILLION_API_KEY
+
+	out, err := client.Send(context.Background(), onebillion.Mail{
+		From:    "Acme <hi@acme.com>",
+		To:      []string{"jane@example.com"},
+		Subject: "Seu código",
+		Text:    "Seu código é 482 913",
+	})
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("accepted: %s", out.Messages[0].ID)
+}
+```
+
+O `Send` retorna quando o 1billion tem o e-mail (`202`, status `accepted`). A entrega roda depois, com as suas próprias tentativas. Cada destinatário recebe um id de mensagem próprio. O `client.Emails.Send` é a mesma chamada, e lembra o `resend.Emails.Send` se você vem do Resend.
+
+## 3. Um recibo, enviado uma vez
+
+```go
+out, err := client.Send(ctx, onebillion.Mail{
+	From:    "Acme <hi@acme.com>",
+	To:      []string{order.Email},
+	ReplyTo: "support@acme.com",
+	Subject: "Seu recibo",
+	HTML:    receiptHTML,
+	Attachments: []onebillion.Attachment{
+		{Filename: "recibo.pdf", ContentType: "application/pdf", Content: base64PDF},
+	},
+}, onebillion.IdempotencyKey("receipt-"+order.ID))
+```
+
+A mesma `IdempotencyKey` em 30 dias retorna a primeira resposta e não envia nada de novo. Assim, um job que roda duas vezes não envia dois recibos. O cliente também repete um `503` ou um erro de rede com a mesma chave.
+
+Para e-mail que uma pessoa está esperando, como um código de login, use `Priority: "high"`: ele vai na frente.
+
+## 4. Trate os erros
+
+```go
+_, err := client.Send(ctx, mail)
+
+switch {
+case onebillion.NoCredits(err):
+	// 429: sem créditos para esses destinatários hoje
+case onebillion.Refused(err):
+	// 422: mensagem inválida, domínio não verificado, ou destinatário que falhou numa checagem
+}
+```
+
+## 5. Verifique o webhook
+
+```go
+http.HandleFunc("/webhooks/1billion", func(w http.ResponseWriter, r *http.Request) {
+	payload, _ := io.ReadAll(r.Body)
+
+	event, err := onebillion.VerifySignature(payload, r.Header, "")
+
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+
+		return
+	}
+
+	if event.Type == "bounced" {
+		markBounced(event.To)
+	}
+
+	w.WriteHeader(http.StatusOK)
+})
+```
+
+Um segredo vazio lê `ONEBILLION_WEBHOOK_SECRET`. Uma assinatura errada, ou um timestamp com mais de 5 minutos, retorna um erro que `errors.Is` reconhece como `onebillion.ErrInvalidSignature`.
+
+A referência completa está no [README do SDK](https://github.com/clowk-in/1billion-go).
+
+## Comece agora
+
+Os primeiros 100 e-mails de cada dia são grátis, todo dia: cada workspace recebe 100.000 créditos à meia-noite, sem cartão. [Entre no console](https://app.1billion.clowk.in), adicione o seu domínio e envie o seu primeiro e-mail em poucos minutos com o [quickstart](/docs/getting-started).
