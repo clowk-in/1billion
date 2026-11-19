@@ -8,6 +8,11 @@ private repository and is never named by its internals here.
 
 - Next.js with `output: 'export'`: a static site in `out/`.
 - Fumadocs MDX: the docs in `content/docs/`, the blog in `content/blog/<locale>/<slug>.mdx`.
+- The blog is a mail app (`components/blog/inbox.tsx`): mailboxes, the list, the open post, and a ⌘K search
+  over an index built at build time. Each post has `folder` (`concepts`, `sdks`, `guides`, `product`), `tags`
+  and a `cover`. The read posts are kept in `localStorage` only (`lib/read-posts.ts`).
+  The blog alone has a light theme: the OS setting, or the switch in the top bar (`html[data-blog-theme]`, in
+  `localStorage`); the tokens are in `app/globals.css`. Code blocks stay dark in both themes.
 - A Cloudflare Worker (`worker/`) serves the files and sends a first visit to `/` from a Portuguese-speaking
   country to `/pt-br/`. The cookie `lang` of the language switch wins.
 - English at `/`, Brazilian Portuguese at `/pt-br/`. The copy of the landing page is in `lib/i18n.ts`.

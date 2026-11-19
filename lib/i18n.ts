@@ -22,6 +22,31 @@ export const htmlLang: Record<Locale, string> = { en: 'en', 'pt-br': 'pt-BR' };
 
 export const ogLocale: Record<Locale, string> = { en: 'en_US', 'pt-br': 'pt_BR' };
 
+type InboxCopy = {
+  all: string;
+  unread: string;
+  folders: string;
+  folder: Record<'concepts' | 'sdks' | 'guides' | 'product', string>;
+  posts: (n: number) => string;
+  allRead: string;
+  to: string;
+  search: string;
+  searchHint: string;
+  noResults: (q: string) => string;
+  move: string;
+  open: string;
+  close: string;
+  copyLink: string;
+  copied: string;
+  fullScreen: string;
+  exitFullScreen: string;
+  reply: string;
+  replyText: string;
+  start: string;
+  toLight: string;
+  toDark: string;
+};
+
 type Row = { eyebrow: string; title: string; text: string };
 
 type Copy = {
@@ -59,7 +84,7 @@ type Copy = {
   cta: { eyebrow: string; title: string; text: string; key: string; quickstart: string };
   footer: { about: string; product: string; docs: string; sdks: string; links: Record<string, string> };
   language: { label: string; other: string; short: string };
-  blog: { nav: string; eyebrow: string; title: string; headline: string; description: string; read: string; back: string; by: string };
+  blog: { nav: string; eyebrow: string; title: string; headline: string; description: string; read: string; back: string; by: string; inbox: InboxCopy };
   terms: { title: string; description: string; questions: string; sections: { title: string; text: string }[] };
 };
 
@@ -204,7 +229,7 @@ const en: Copy = {
       terms: 'Terms',
     },
   },
-  language: { label: 'Language', other: 'Português', short: 'PT' },
+  language: { label: 'Language', other: 'Português', short: 'EN' },
   blog: {
     nav: 'Blog',
     eyebrow: 'The 1billion blog',
@@ -214,6 +239,30 @@ const en: Copy = {
     read: 'Read the post',
     back: 'All posts',
     by: 'by',
+    inbox: {
+      all: 'Inbox',
+      unread: 'Unread',
+      folders: 'Folders',
+      folder: { concepts: 'Concepts', sdks: 'SDKs', guides: 'Guides', product: 'Product' },
+      posts: n => `${n} ${n === 1 ? 'post' : 'posts'}`,
+      allRead: 'All caught up. No unread posts.',
+      to: 'To: you',
+      search: 'Search posts',
+      searchHint: 'Search posts: msa, webhook, go, idempotency…',
+      noResults: q => `No post has “${q}”. Try msa, webhook or rails.`,
+      move: 'move',
+      open: 'open',
+      close: 'close',
+      copyLink: 'Copy link',
+      copied: 'Copied',
+      fullScreen: 'Full screen',
+      exitFullScreen: 'Exit full screen',
+      reply: 'Re:',
+      replyText: 'The first 100 mails of each day are free, every day. No card. Log in and send your first mail in a few minutes.',
+      start: 'Start sending free',
+      toLight: 'Switch to the light theme',
+      toDark: 'Switch to the dark theme',
+    },
   },
   terms: {
     title: 'Terms',
@@ -390,7 +439,7 @@ const pt: Copy = {
       terms: 'Termos',
     },
   },
-  language: { label: 'Idioma', other: 'English', short: 'EN' },
+  language: { label: 'Idioma', other: 'English', short: 'PT' },
   blog: {
     nav: 'Blog',
     eyebrow: 'O blog do 1billion',
@@ -401,6 +450,30 @@ const pt: Copy = {
     read: 'Ler o post',
     back: 'Todos os posts',
     by: 'por',
+    inbox: {
+      all: 'Caixa de entrada',
+      unread: 'Não lidos',
+      folders: 'Pastas',
+      folder: { concepts: 'Conceitos', sdks: 'SDKs', guides: 'Guias', product: 'Produto' },
+      posts: n => `${n} ${n === 1 ? 'post' : 'posts'}`,
+      allRead: 'Tudo lido. Nenhum post novo.',
+      to: 'Para: você',
+      search: 'Buscar posts',
+      searchHint: 'Buscar posts: msa, webhook, go, idempotência…',
+      noResults: q => `Nenhum post tem “${q}”. Tente msa, webhook ou rails.`,
+      move: 'mover',
+      open: 'abrir',
+      close: 'fechar',
+      copyLink: 'Copiar link',
+      copied: 'Copiado',
+      fullScreen: 'Tela cheia',
+      exitFullScreen: 'Sair da tela cheia',
+      reply: 'Re:',
+      replyText: 'Os primeiros 100 e-mails de cada dia são grátis, todo dia. Sem cartão. Entre e envie o seu primeiro e-mail em poucos minutos.',
+      start: 'Comece a enviar grátis',
+      toLight: 'Mudar para o tema claro',
+      toDark: 'Mudar para o tema escuro',
+    },
   },
   terms: {
     title: 'Termos',

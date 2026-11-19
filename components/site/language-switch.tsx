@@ -10,7 +10,8 @@ import { copy, type Locale } from '@/lib/i18n';
 type Props = {
   locale: Locale;
   href: string;
-  // The short form for the menu: the icon and EN or PT.
+  // The short form for the menu: the icon and the language of this page (EN
+  // or PT). A click goes to the other one.
   compact?: boolean;
 };
 

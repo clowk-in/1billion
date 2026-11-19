@@ -251,3 +251,108 @@ body {
     display: none;
   }
 }
+
+/* blog: a light theme, for the blog only (the rest of the site is dark). It
+   follows the OS setting; the switch in the top bar sets
+   html[data-blog-theme] and wins. Code blocks stay dark in both themes: the
+   highlighter has dark colors only. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-blog-theme='dark']) .blog {
+    color-scheme: light;
+    --color-bg: #f7f5fc;
+    --color-deep: #efecf8;
+    --color-bar: #ffffff;
+    --color-panel: #ffffff;
+    --color-panel2: #f1edfb;
+    --color-line: #e2dcf2;
+    --color-line2: #d4cbeb;
+    --color-ink: #1a1530;
+    --color-sub: #6b6488;
+    --color-brandtext: #5a28d6;
+    --color-brandwash: #ece4ff;
+    --color-fd-background: #ffffff;
+    --color-fd-foreground: #1a1530;
+    --color-fd-muted: #f1edfb;
+    --color-fd-muted-foreground: #6b6488;
+    --color-fd-popover: #ffffff;
+    --color-fd-popover-foreground: #1a1530;
+    --color-fd-card: #ffffff;
+    --color-fd-card-foreground: #1a1530;
+    --color-fd-border: #e2dcf2;
+    --color-fd-primary: #5a28d6;
+    --color-fd-primary-foreground: #ffffff;
+    --color-fd-secondary: #f1edfb;
+    --color-fd-secondary-foreground: #1a1530;
+    --color-fd-accent: #f1edfb;
+    --color-fd-accent-foreground: #1a1530;
+    --color-fd-ring: #5a28d6;
+  }
+
+  :root:not([data-blog-theme='dark']) .blog .blog-logo-dark {
+    display: none;
+  }
+
+  :root:not([data-blog-theme='dark']) .blog .blog-logo-light {
+    display: block;
+  }
+}
+
+:root[data-blog-theme='light'] .blog {
+    color-scheme: light;
+    --color-bg: #f7f5fc;
+    --color-deep: #efecf8;
+    --color-bar: #ffffff;
+    --color-panel: #ffffff;
+    --color-panel2: #f1edfb;
+    --color-line: #e2dcf2;
+    --color-line2: #d4cbeb;
+    --color-ink: #1a1530;
+    --color-sub: #6b6488;
+    --color-brandtext: #5a28d6;
+    --color-brandwash: #ece4ff;
+    --color-fd-background: #ffffff;
+    --color-fd-foreground: #1a1530;
+    --color-fd-muted: #f1edfb;
+    --color-fd-muted-foreground: #6b6488;
+    --color-fd-popover: #ffffff;
+    --color-fd-popover-foreground: #1a1530;
+    --color-fd-card: #ffffff;
+    --color-fd-card-foreground: #1a1530;
+    --color-fd-border: #e2dcf2;
+    --color-fd-primary: #5a28d6;
+    --color-fd-primary-foreground: #ffffff;
+    --color-fd-secondary: #f1edfb;
+    --color-fd-secondary-foreground: #1a1530;
+    --color-fd-accent: #f1edfb;
+    --color-fd-accent-foreground: #1a1530;
+    --color-fd-ring: #5a28d6;
+}
+
+:root[data-blog-theme='light'] .blog .blog-logo-dark {
+  display: none;
+}
+
+:root[data-blog-theme='light'] .blog .blog-logo-light {
+  display: block;
+}
+
+/* blog: the black logo, for the light theme, hides in the dark theme */
+.blog-logo-light {
+  display: none;
+}
+
+/* blog: code blocks keep the dark colors in the light theme */
+.blog .prose figure,
+.blog .prose pre {
+  color-scheme: dark;
+  --color-fd-background: #0c0a14;
+  --color-fd-foreground: #eeebf7;
+  --color-fd-muted: #151126;
+  --color-fd-muted-foreground: #a7a0c2;
+  --color-fd-card: #151126;
+  --color-fd-card-foreground: #eeebf7;
+  --color-fd-border: #2b2545;
+  --color-fd-secondary: #1d1833;
+  --color-fd-accent: #1d1833;
+  --color-fd-accent-foreground: #eeebf7;
+}

@@ -18,6 +18,10 @@ export const blog = defineCollections({
     author: z.string(),
     // The image of the post in the blog index, a file in public/.
     cover: z.string().optional(),
+    // The folder of the post in the inbox of the blog.
+    folder: z.enum(['concepts', 'sdks', 'guides', 'product']),
+    // Words that the search of the blog matches, shown as #tags.
+    tags: z.array(z.string()).default([]),
   }),
 });
 

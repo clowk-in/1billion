@@ -53,3 +53,41 @@ export function formatDate(date: string, locale: Locale) {
 
   return new Date(`${day(date)}T12:00:00Z`).toLocaleDateString(tag, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 }
+
+// The text of a post with no frontmatter, code or markup: what the search of
+// the blog matches. It runs at build time only.
+function plainText(fullPath: string) {
+  return readFileSync(fullPath, 'utf8')
+    .replace(/^---[\s\S]*?---/, '')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[#*`>|_-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// One post as the inbox shows it: plain values that a client component can take.
+export type InboxItem = {
+  slug: string;
+  title: string;
+  description: string;
+  date: string;
+  author: string;
+  folder: Post['folder'];
+  tags: string[];
+  text: string;
+};
+
+export function inbox(locale: Locale): InboxItem[] {
+  return posts(locale).map(entry => ({
+    slug: entry.slug,
+    title: entry.title,
+    description: entry.description ?? '',
+    date: entry.date,
+    author: entry.author,
+    folder: entry.folder,
+    tags: entry.tags,
+    text: plainText(entry.info.fullPath),
+  }));
+}

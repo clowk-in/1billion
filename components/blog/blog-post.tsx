@@ -1,12 +1,8 @@
-import { ArrowLeft } from 'lucide-react';
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { getMDXComponents } from '@/components/mdx';
-import { Footer } from '@/components/site/footer';
-import { Header } from '@/components/site/header';
-import { day, formatDate, post, posts, translation } from '@/lib/blog';
+import { day, formatDate, type Post, post, posts, translation } from '@/lib/blog';
 import { blogHome, copy, htmlLang, type Locale, ogLocale } from '@/lib/i18n';
 import { clowk, JsonLd, shareImageFor } from '@/lib/seo';
 import { site } from '@/lib/site';
@@ -59,11 +55,6 @@ export function BlogPost({ locale, slug }: { locale: Locale; slug: string }) {
 
   if (!entry) notFound();
 
-  const t = copy[locale].blog;
-  const other = translation(entry);
-  const alternate = other ? path(other.locale, slug) : blogHome[locale === 'en' ? 'pt-br' : 'en'];
-  const MDX = entry.body;
-
   const data = {
     '@context': 'https://schema.org',
     '@type': 'BlogPosting',
@@ -81,34 +72,80 @@ export function BlogPost({ locale, slug }: { locale: Locale; slug: string }) {
     <>
       <JsonLd data={data} />
 
-      <Header locale={locale} alternate={alternate} />
-
-      <main lang={htmlLang[locale]} className="mx-auto w-full max-w-3xl flex-1 px-4 pb-24 pt-32 md:px-6 md:pt-40">
-        <Link href={blogHome[locale]} className="inline-flex items-center gap-2 text-[14px] text-sub hover:text-ink">
-          <ArrowLeft size={16} aria-hidden="true" />
-          {t.back}
-        </Link>
-
-        <article className="mt-8">
-          <header className="flex flex-col gap-4 border-b border-line pb-8">
-            <h1 className="font-display text-[40px] font-extrabold leading-[1.05] tracking-[-0.035em] text-ink md:text-[56px]">
-              {entry.title}
-            </h1>
-
-            <p className="text-[18px] leading-relaxed text-sub">{entry.description}</p>
-
-            <p className="font-mono text-[13px] text-sub">
-              <time dateTime={entry.date}>{formatDate(entry.date, locale)}</time> · {t.by} {entry.author}
-            </p>
-          </header>
-
-          <div className="prose mt-10 max-w-none">
-            <MDX components={getMDXComponents()} />
-          </div>
-        </article>
-      </main>
-
-      <Footer locale={locale} alternate={alternate} />
+      <PostPane entry={entry} locale={locale} />
     </>
+  );
+}
+
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .map(part => part[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+}
+
+// The open post, as a mail: who sent it and when, the subject, the tags, the
+// cover, the text, and a reply box that asks the reader to start sending.
+export function PostPane({ entry, locale }: { entry: Post; locale: Locale }) {
+  const t = copy[locale].blog;
+  const MDX = entry.body;
+
+  return (
+    <div className="max-w-[760px] px-4 pb-16 pt-6 md:px-8">
+      <header className="grid grid-cols-[44px_minmax(0,1fr)] items-center gap-x-3.5 gap-y-1 border-b border-line pb-4 md:grid-cols-[44px_minmax(0,1fr)_auto]">
+        <span className="row-span-2 grid size-11 place-items-center rounded-full bg-brand font-extrabold text-white" aria-hidden="true">
+          {initials(entry.author)}
+        </span>
+
+        <span className="truncate font-bold">{entry.author}</span>
+
+        <time dateTime={entry.date} className="hidden self-start text-[12px] text-sub md:row-span-2 md:block">
+          {formatDate(entry.date, locale)}
+        </time>
+
+        <span className="text-[13px] text-sub">
+          {t.inbox.to} · {t.inbox.folder[entry.folder]}
+          <span className="md:hidden"> · {formatDate(entry.date, locale)}</span>
+        </span>
+      </header>
+
+      <h1 className="mb-2.5 mt-6 text-balance font-display text-[28px] font-extrabold leading-[1.1] tracking-[-0.025em] text-ink md:text-[36px]">
+        {entry.title}
+      </h1>
+
+      {entry.tags.length > 0 && (
+        <p className="mb-5 flex flex-wrap gap-1.5">
+          {entry.tags.map(tag => (
+            <span key={tag} className="rounded-full bg-brandwash px-2 py-0.5 font-mono text-[11px] text-brandtext">
+              #{tag}
+            </span>
+          ))}
+        </p>
+      )}
+
+      {entry.cover && (
+        <img src={entry.cover} alt="" width={1200} height={630} className="mb-6 w-full rounded-xl border border-line" />
+      )}
+
+      <div className="prose max-w-none">
+        <MDX components={getMDXComponents()} />
+      </div>
+
+      <section className="mt-10 overflow-hidden rounded-xl border border-line">
+        <p className="border-b border-line bg-panel2 px-3.5 py-2.5 font-mono text-[12px] text-sub">
+          {t.inbox.reply} {entry.title}
+        </p>
+
+        <div className="flex flex-col gap-3.5 p-4 md:flex-row md:items-center md:justify-between">
+          <p className="text-[15px] leading-normal text-ink">{t.inbox.replyText}</p>
+
+          <a href={site.app} className="btn-buy shrink-0 rounded-lg px-4 py-2.5 text-center text-[14px] font-bold">
+            {t.inbox.start}
+          </a>
+        </div>
+      </section>
+    </div>
   );
 }

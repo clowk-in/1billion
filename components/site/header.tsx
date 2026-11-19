@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { Logo } from '@/components/brand/logo';
 import { LanguageSwitch } from '@/components/site/language-switch';
@@ -30,9 +30,14 @@ type Props = {
   locale?: Locale;
   // The same page in the other language, for the language switch.
   alternate?: string;
+  // The blog: a bar of the full width on top of the inbox, which never hides,
+  // because the page itself does not scroll.
+  wide?: boolean;
+  // More buttons before the language switch (the search of the blog).
+  actions?: ReactNode;
 };
 
-export function Header({ locale = 'en', alternate }: Props) {
+export function Header({ locale = 'en', alternate, wide, actions }: Props) {
   const [hidden, setHidden] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
@@ -67,17 +72,23 @@ export function Header({ locale = 'en', alternate }: Props) {
 
   // The pill keeps a gap to the edges of the screen, and the safe area of iOS
   // sits above that gap.
-  const barClass = [
+  const floatingBar = [
     'fixed inset-x-0 top-0 z-40 px-3 pt-[calc(env(safe-area-inset-top)+12px)]',
     'transition-transform duration-300',
     hidden && !open ? '-translate-y-[calc(100%+12px)]' : 'translate-y-0',
   ].join(' ');
 
+  const wideBar = 'relative z-40 shrink-0 border-b border-line bg-bg pt-[env(safe-area-inset-top)]';
+
   const frame = scrolled || open
     ? 'border-line bg-bg/80 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.6)] backdrop-blur'
     : 'border-transparent bg-transparent';
 
-  const pillClass = `mx-auto flex h-14 max-w-6xl items-center justify-between rounded-2xl border px-4 transition-colors duration-300 md:px-5 ${frame}`;
+  const floatingPill = `mx-auto flex h-14 max-w-6xl items-center justify-between rounded-2xl border px-4 transition-colors duration-300 md:px-5 ${frame}`;
+  const widePill = 'flex h-16 items-center justify-between gap-3 px-4 md:px-6';
+
+  const barClass = wide ? wideBar : floatingBar;
+  const pillClass = wide ? widePill : floatingPill;
 
   // The menu is a sibling of the header, not a child: the blur and the slide
   // of the header make it the box of any fixed child, and the menu must cover
@@ -88,7 +99,17 @@ export function Header({ locale = 'en', alternate }: Props) {
         <div className={pillClass}>
           <div className="flex items-center gap-6">
             <Link href={home[locale]} aria-label={t.home} className="rounded-md">
-              <Logo height={26} />
+              {wide ? (
+                <>
+                  <span className="blog-logo-dark">
+                    <Logo height={26} />
+                  </span>
+
+                  <img src="/brand/logo-black.svg" alt="1billion" width={114} height={26} className="blog-logo-light h-[26px] w-auto" />
+                </>
+              ) : (
+                <Logo height={26} />
+              )}
             </Link>
 
             <nav className="hidden items-center gap-1 md:flex" aria-label="Main">
@@ -100,7 +121,15 @@ export function Header({ locale = 'en', alternate }: Props) {
             </nav>
           </div>
 
+          <div className="flex items-center gap-1 md:hidden">
+            {actions}
+
+            <MenuButton open={open} label={open ? t.closeMenu : t.openMenu} onToggle={() => setOpen(value => !value)} />
+          </div>
+
           <div className="hidden items-center gap-1 md:flex">
+            {actions}
+
             <LanguageSwitch locale={locale} href={switchTo} compact />
 
             {site.social.map(network => (
@@ -118,8 +147,6 @@ export function Header({ locale = 'en', alternate }: Props) {
               {t.signIn}
             </a>
           </div>
-
-          <MenuButton open={open} label={open ? t.closeMenu : t.openMenu} onToggle={() => setOpen(value => !value)} />
         </div>
       </header>
 
