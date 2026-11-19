@@ -44,6 +44,7 @@ type InboxCopy = {
   replyText: string;
   start: string;
   toLight: string;
+  rss: string;
   toDark: string;
 };
 
@@ -261,6 +262,7 @@ const en: Copy = {
       replyText: 'The first 100 mails of each day are free, every day. No card. Log in and send your first mail in a few minutes.',
       start: 'Start sending free',
       toLight: 'Switch to the light theme',
+      rss: 'RSS feed of the blog',
       toDark: 'Switch to the dark theme',
     },
   },
@@ -472,6 +474,7 @@ const pt: Copy = {
       replyText: 'Os primeiros 100 e-mails de cada dia são grátis, todo dia. Sem cartão. Entre e envie o seu primeiro e-mail em poucos minutos.',
       start: 'Comece a enviar grátis',
       toLight: 'Mudar para o tema claro',
+      rss: 'Feed RSS do blog',
       toDark: 'Mudar para o tema escuro',
     },
   },

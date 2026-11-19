@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, BookOpen, Check, Code, Inbox as InboxIcon, Lightbulb, Link2, Mail, Maximize2, Megaphone, Minimize2, Search } from 'lucide-react';
+import { ArrowLeft, BookOpen, Check, Code, Inbox as InboxIcon, Lightbulb, Link2, Mail, Maximize2, Megaphone, Minimize2, Rss, Search } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
@@ -99,19 +99,28 @@ export function Inbox({ locale, items, otherSlugs, children }: Props) {
 
   const searchButton = (
     <>
+      <a
+        href={`${home}feed.xml`}
+        aria-label={t.rss}
+        title={t.rss}
+        className="flex size-10 items-center justify-center rounded-md text-sub hover:bg-panel2 hover:text-ink"
+      >
+        <Rss size={17} aria-hidden="true" />
+      </a>
+
       <ThemeSwitch locale={locale} />
 
       <button
-      type="button"
-      onClick={() => setSearching(true)}
-      aria-label={t.search}
-      className="flex h-10 items-center gap-2 rounded-lg border border-line bg-panel px-3 text-[13px] text-sub hover:text-ink md:w-64"
-    >
-      <Search size={15} aria-hidden="true" />
+        type="button"
+        onClick={() => setSearching(true)}
+        aria-label={t.search}
+        className="flex h-10 items-center gap-2 rounded-lg border border-line bg-panel px-3 text-[13px] text-sub hover:text-ink md:w-64"
+      >
+        <Search size={15} aria-hidden="true" />
 
-      <span className="hidden flex-1 text-left md:inline">{t.search}</span>
+        <span className="hidden flex-1 text-left md:inline">{t.search}</span>
 
-      <kbd className="hidden rounded border border-line px-1.5 font-mono text-[11px] md:inline">⌘K</kbd>
+        <kbd className="hidden rounded border border-line px-1.5 font-mono text-[11px] md:inline">⌘K</kbd>
       </button>
     </>
   );
