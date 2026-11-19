@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import { PostPane } from '@/components/blog/blog-post';
 import { posts } from '@/lib/blog';
+import { feedAlternate } from '@/lib/feed';
 import { blogHome, copy, type Locale, ogLocale } from '@/lib/i18n';
 import { shareImageFor } from '@/lib/seo';
 import { site } from '@/lib/site';
@@ -15,6 +16,7 @@ export function blogIndexMetadata(locale: Locale): Metadata {
     alternates: {
       canonical: blogHome[locale],
       languages: { en: blogHome.en, 'pt-BR': blogHome['pt-br'], 'x-default': blogHome.en },
+      types: feedAlternate(locale),
     },
     openGraph: {
       title: `${t.title} | ${site.name}`,

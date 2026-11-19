@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { getMDXComponents } from '@/components/mdx';
 import { day, formatDate, type Post, post, posts, translation } from '@/lib/blog';
+import { feedAlternate } from '@/lib/feed';
 import { blogHome, copy, htmlLang, type Locale, ogLocale } from '@/lib/i18n';
 import { clowk, JsonLd, shareImageFor } from '@/lib/seo';
 import { site } from '@/lib/site';
@@ -29,7 +30,7 @@ export function postMetadata(locale: Locale, slug: string): Metadata {
     title: entry.title,
     description: entry.description,
     authors: [{ name: entry.author }],
-    alternates: { canonical: path(locale, slug), languages },
+    alternates: { canonical: path(locale, slug), languages, types: feedAlternate(locale) },
     openGraph: {
       title: entry.title,
       description: entry.description,
