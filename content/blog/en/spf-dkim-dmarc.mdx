@@ -1,0 +1,78 @@
+---
+title: 'SPF, DKIM and DMARC: what they are'
+description: Three DNS records tell a mailbox provider that a mail really comes from your domain. What each one checks, how they work together, and how 1billion sets them up.
+date: '2026-11-19T12:00:00Z'
+author: Thadeu Esteves
+folder: concepts
+tags: [dns, spf, dkim, dmarc, deliverability]
+cover: /blog/spf-dkim-dmarc/cover.png
+---
+
+Anyone can write `From: hi@acme.com` on a mail. SMTP does not check it. So Gmail, Outlook and the other mailbox providers look at three DNS records to know if a mail really comes from `acme.com`: SPF, DKIM and DMARC.
+
+## SPF: which servers can send
+
+SPF (Sender Policy Framework) is a TXT record that lists the servers that can send mail for a domain:
+
+```txt
+v=spf1 include:_spf.example.net -all
+```
+
+The receiving server reads the domain of the **envelope sender** (the `MAIL FROM` of the SMTP talk, also called the return path), finds its SPF record, and checks the IP address that connects. If the IP is not on the list, SPF fails.
+
+SPF has two limits:
+
+- It checks the envelope sender, not the `From` that the person sees.
+- It breaks when a mail is forwarded, because the forwarder has a new IP.
+
+## DKIM: a signature on the mail
+
+DKIM (DomainKeys Identified Mail) signs each mail. The sending server makes a hash of the body and of some headers, and signs it with a private key. It adds the result as a `DKIM-Signature` header:
+
+```txt
+DKIM-Signature: v=1; a=rsa-sha256; d=acme.com; s=1billion; h=From:To:Subject:Date; bh=…; b=…
+```
+
+`d` is the domain and `s` is the selector. The receiving server reads the public key at `<selector>._domainkey.<domain>`, and checks the signature. If someone changes the body or a signed header on the way, DKIM fails.
+
+A DKIM signature stays on the mail when it is forwarded. This is why DKIM is the strongest of the three.
+
+## DMARC: the rule that joins them
+
+SPF and DKIM do not look at the `From` that the person sees. DMARC (Domain-based Message Authentication, Reporting and Conformance) closes that gap. It is a TXT record at `_dmarc.<domain>`:
+
+```txt
+v=DMARC1; p=none; rua=mailto:dmarc@acme.com
+```
+
+DMARC passes when SPF or DKIM passes **and** its domain matches the domain of `From`. This match is called *alignment*. With relaxed alignment (the default), a subdomain also matches: `mail.acme.com` aligns with `acme.com`.
+
+`p` tells the receiver what to do with a mail that fails:
+
+| `p` | What the receiver does |
+|---|---|
+| `none` | Nothing. It only sends reports to `rua`. |
+| `quarantine` | It puts the mail in spam. |
+| `reject` | It refuses the mail. |
+
+Start with `p=none`, read the reports, and go to `quarantine` or `reject` when all of your senders pass.
+
+## How 1billion sets them up
+
+When you add a domain to an app in the console, it shows these records:
+
+| Type | Name | What |
+|---|---|---|
+| TXT | `1billion._domainkey.<domain>` | The DKIM public key |
+| CNAME | `1billion.<domain>` | Our return path, which holds the SPF and the MX |
+| TXT | `_dmarc.<domain>` | A DMARC policy, for example `v=DMARC1; p=none;` |
+
+- **DKIM:** 1billion signs each mail with the private key of your domain. We keep that key encrypted, and it never leaves our servers.
+- **SPF:** the envelope sender is `bounces+<message id>@1billion.<your domain>`. The CNAME points that name to our host, so SPF passes, and it aligns with your domain. When our servers change, only our records change: you never edit your DNS again.
+- **DMARC:** it is not required, but mailbox providers trust a domain with DMARC more. The console shows a warning when it is missing.
+
+The console checks the records for you, and the domain can send when DKIM, SPF and MX pass. The full table is in [Domains and DNS](/docs/guides/domains).
+
+## Start now
+
+The first 100 mails of each day are free, every day: each workspace gets 100,000 credits at midnight, with no card. [Log in to the console](https://app.1billion.clowk.in), add your domain, and send your first mail in a few minutes with the [quickstart](/docs/getting-started).

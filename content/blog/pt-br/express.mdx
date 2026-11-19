@@ -1,0 +1,114 @@
+---
+title: Envie e-mail do Express com o 1billion
+description: Envie um código de login de um app Express com o @clowk/1billion, trate os erros em uma rota e verifique um webhook no corpo cru.
+date: '2026-11-19T16:00:00Z'
+author: Thadeu Esteves
+folder: sdks
+tags: [express, node, javascript, webhook]
+cover: /blog/express/cover.png
+---
+
+Este post envia e-mail de um app Express com o `@clowk/1billion`. O pacote precisa do Node.js 22 ou mais novo. Ele é só ESM, sem dependências.
+
+## 1. Instale e configure a chave
+
+```bash
+pnpm add express @clowk/1billion
+```
+
+Crie uma API key no [console](https://app.1billion.clowk.in), verifique o domínio de onde você envia e coloque a chave no ambiente. Nunca coloque a chave em código que vai para o navegador.
+
+```bash
+export ONEBILLION_API_KEY=<a sua API key>
+```
+
+## 2. Envie um código de login
+
+```ts
+// server.ts
+import express from "express"
+import { OneBillion, OneBillionError } from "@clowk/1billion"
+
+const app = express()
+const mail = new OneBillion() // lê ONEBILLION_API_KEY
+
+app.post("/api/login-code", express.json(), async (req, res) => {
+  const { email } = req.body
+  const code = makeCode()
+
+  await mail.send({
+    from: "Acme <hi@acme.com>",
+    to: email,
+    subject: "Your code",
+    text: `Your code is ${code}`,
+    priority: "high",
+    idempotencyKey: `login-${email}-${code}`,
+  })
+
+  res.json({ ok: true })
+})
+
+app.listen(3000)
+```
+
+- O `send` retorna quando o 1billion tem o e-mail (`202`, status `accepted`). A entrega acontece depois, com as suas próprias tentativas.
+- `priority: "high"` é para e-mail que uma pessoa está esperando: ele vai primeiro na fila do workspace.
+- `idempotencyKey` dá nome a este e-mail. Se o cliente tenta de novo depois de um erro de rede, ou a pessoa clica duas vezes, a mesma chave não envia nada novo.
+
+O cliente tenta de novo 3 vezes no total depois de um `503` ou de um erro de rede, e espera 10 segundos em cada tentativa. Você muda isso com `new OneBillion({ timeoutMs, backoffMs })`.
+
+## 3. Trate os erros
+
+O `mail.send` lança um `OneBillionError`. O Express 5 envia o erro de uma rota `async` para o handler de erro, então você trata tudo em um lugar só:
+
+```ts
+app.use((error, req, res, next) => {
+  if (!(error instanceof OneBillionError)) return next(error)
+
+  if (error.noCredits) {
+    return res.status(503).json({ error: "try again later", retry_after: error.body.retry_after })
+  }
+
+  if (error.refused) {
+    return res.status(422).json({ error: "this e-mail address does not work", check: error.body.check })
+  }
+
+  next(error)
+})
+```
+
+- `noCredits` é um `429`: sem créditos para esses destinatários hoje.
+- `refused` é um `422`: uma mensagem ruim, um domínio não verificado ou um destinatário que falhou em uma verificação (por exemplo uma caixa descartável).
+- `error.status` é o status HTTP, e `0` para um erro de rede.
+
+Se você vem do Resend, o `mail.emails.send` é a mesma chamada do `resend.emails.send`: ele retorna `{ data, error }` e nunca lança erro.
+
+## 4. Verifique um webhook
+
+A assinatura é sobre o corpo **cru**, então esta rota não pode usar o `express.json()`. Use o `express.raw()` nela:
+
+```ts
+app.post("/webhooks/1billion", express.raw({ type: "application/json" }), (req, res) => {
+  let event
+
+  try {
+    event = OneBillion.verifySignature({ payload: req.body, headers: req.headers })
+  } catch {
+    return res.sendStatus(401)
+  }
+
+  if (event.type === "bounced") markBounced(event.to)
+
+  res.sendStatus(204)
+})
+```
+
+O `verifySignature` aceita o `Buffer` do `express.raw()` e o `req.headers` simples do Node. Ele lê o segredo de `ONEBILLION_WEBHOOK_SECRET` e lança erro para uma assinatura ruim ou um timestamp com mais de 5 minutos.
+
+A entrega é pelo menos uma vez, então guarde o `id` de cada evento e pule os que você já tratou. O padrão completo está em [Webhooks de entrega na prática](/pt-br/blog/delivery-webhooks/).
+
+A referência completa está na [documentação do Node.js](/docs/sdks/javascript) e no [README do SDK](https://github.com/clowk-in/1billion-js).
+
+## Comece agora
+
+Os primeiros 100 e-mails de cada dia são grátis, todo dia: cada workspace recebe 100.000 créditos à meia-noite, sem cartão. [Entre no console](https://app.1billion.clowk.in), adicione o seu domínio e envie o seu primeiro e-mail em poucos minutos com o [quickstart](/docs/getting-started).

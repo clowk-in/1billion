@@ -1,0 +1,82 @@
+---
+title: Idempotência, para não enviar um e-mail duas vezes
+description: Um timeout não diz se o e-mail foi. Com um Idempotency-Key, uma nova tentativa devolve a primeira resposta e não envia nada novo. Como escolher uma boa chave.
+date: '2026-11-19T15:00:00Z'
+author: Thadeu Esteves
+folder: guides
+tags: [idempotency, retries, jobs]
+cover: /blog/idempotency/cover.png
+---
+
+O seu app chama o `POST /send`, e a rede cai antes da resposta chegar. O e-mail foi? Você não tem como saber. Se tentar de novo, o cliente pode receber dois recibos. Se não tentar, o cliente pode não receber nenhum.
+
+Esse é o problema que a idempotência resolve: **a mesma requisição, enviada várias vezes, tem o efeito de uma só**.
+
+## De onde vem um segundo envio
+
+- **Um timeout.** A requisição chegou ao servidor, mas a resposta não voltou.
+- **Um job que roda de novo.** Um worker envia o e-mail e cai antes de marcar o job como feito. A fila entrega o job para outro worker.
+- **Uma função que roda de novo.** A AWS Lambda roda de novo uma invocação assíncrona que falhou.
+- **Uma pessoa que clica duas vezes** em "Me envie o código".
+
+## O cabeçalho Idempotency-Key
+
+Envie um cabeçalho `Idempotency-Key` com o `POST /send`:
+
+```http
+POST /send
+Authorization: Bearer <API key>
+Idempotency-Key: receipt-8812
+```
+
+A mesma chave, do mesmo app, em 30 dias devolve a primeira resposta, com `200` no lugar de `202`, e não envia nada novo. Então você pode tentar de novo quantas vezes precisar.
+
+## Escolha uma chave que dá nome ao e-mail
+
+A chave tem que ser igual toda vez que você quer dizer o **mesmo** e-mail, e diferente para um e-mail diferente. Monte a chave com os seus dados:
+
+| E-mail | Chave |
+|---|---|
+| O recibo de um pedido | `receipt-<id do pedido>` |
+| Um código de login | `login-<usuário>-<código>` |
+| O e-mail de boas-vindas | `welcome-<id do usuário>` |
+| Uma troca de senha | `reset-<id do token>` |
+
+Não use um valor aleatório criado na hora do envio. Um job que roda de novo cria outro valor aleatório, e o e-mail vai de novo.
+
+## Com os SDKs
+
+Os SDKs tentam de novo 3 vezes no total, depois de um `503` ou de um erro de rede, com a mesma chave. Só esses dois erros valem uma nova tentativa: qualquer outro erro dá a mesma resposta na próxima vez.
+
+Se você não passa uma chave, o cliente cria uma para as próprias tentativas. Essa chave é nova a cada chamada do seu código, então ela não protege você de um job que roda de novo. Para isso, passe a sua chave:
+
+```ts
+await mail.send({
+  from: "Acme <hi@acme.com>",
+  to: order.email,
+  subject: "Your receipt",
+  html: receiptHtml,
+  idempotencyKey: `receipt-${order.id}`,
+})
+```
+
+```ruby
+OneBillion::Emails.send(
+  { from: "Acme <hi@acme.com>", to: order.email, subject: "Your receipt", html: receipt_html },
+  { idempotency_key: "receipt-#{order.id}" }
+)
+```
+
+```go
+client.Send(ctx, mail, onebillion.IdempotencyKey("receipt-"+order.ID))
+```
+
+Com o Action Mailer, a gem Ruby usa o `Message-ID` do e-mail como chave, então um job `deliver_later` que roda de novo não envia nada novo.
+
+## A mesma ideia do outro lado
+
+Os webhooks têm o mesmo problema, no sentido contrário: o 1billion envia cada evento pelo menos uma vez, então o seu app pode receber o mesmo evento duas vezes. Guarde o `id` de cada evento e pule os que você já tratou. Veja [Webhooks de entrega na prática](/pt-br/blog/delivery-webhooks/).
+
+## Comece agora
+
+Os primeiros 100 e-mails de cada dia são grátis, todo dia: cada workspace recebe 100.000 créditos à meia-noite, sem cartão. [Entre no console](https://app.1billion.clowk.in), adicione o seu domínio e envie o seu primeiro e-mail em poucos minutos com o [quickstart](/docs/getting-started).

@@ -1,0 +1,70 @@
+---
+title: 'Cuidado com e-mails de função: entenda o risco'
+description: Endereços como contato@, info@ e noreply@ pertencem a uma equipe ou a ninguém. Por que e-mail para eles, e e-mail de noreply@, pode ir para o spam, e o que usar no lugar.
+date: '2026-11-19T17:00:00Z'
+author: Thadeu Esteves
+folder: concepts
+tags: [role-address, noreply, deliverability, validation]
+cover: /blog/role-addresses/cover.png
+---
+
+Um **e-mail de função** é o endereço de uma função, não de uma pessoa: `contato@`, `info@`, `vendas@`, `suporte@`, `admin@`, `noreply@`. Em geral uma equipe lê, uma ferramenta de tickets lê, ou ninguém lê.
+
+Eles parecem inofensivos. Mas prejudicam a sua entregabilidade de dois lados: quando você envia **para** eles, e quando você envia **de** `noreply@`.
+
+## Enviar para um e-mail de função
+
+Quando uma pessoa se cadastra com `contato@acme.com.br`, o seu e-mail não vai para essa pessoa. Ele vai para uma caixa compartilhada, uma lista de distribuição ou uma fila de tickets. Isso causa problemas:
+
+- **Ninguém pediu o e-mail.** Quem se cadastrou é um entre vários leitores. Os outros não conhecem o seu produto, e alguns clicam em **Denunciar spam**. Cada clique é uma reclamação contra o seu domínio.
+- **A lista muda, o endereço fica.** A pessoa sai da equipe, e o seu e-mail continua chegando para quem nunca se cadastrou.
+- **Ninguém lê.** Muitas caixas `info@` e `admin@` estão cheias ou abandonadas. E-mail que ninguém abre diz ao provedor que o seu e-mail não é desejado.
+- **Bots usam esses endereços.** Bots de cadastro e coletores de listas preenchem formulários com e-mails de função, porque todo domínio tem.
+
+O resultado é mais reclamações e menos engajamento, e os dois empurram o seu próximo e-mail para o spam, também para as pessoas que queriam receber.
+
+## Enviar de noreply@
+
+`From: noreply@acme.com.br` diz à pessoa: "não responda". Isso também prejudica:
+
+- **A pessoa não pode responder, então denuncia.** Quem quer parar de receber, ou tem uma dúvida, não consegue responder. O botão **Denunciar spam** é a saída fácil.
+- **Uma resposta é um bom sinal.** Quando as pessoas respondem o seu e-mail, ou adicionam você aos contatos, os provedores veem um remetente com quem as pessoas conversam. O `noreply@` joga esse sinal fora.
+- **Respostas se perdem.** As pessoas respondem mesmo assim, e a resposta volta ou não vai a lugar nenhum. Um cliente com um problema recebe silêncio.
+
+## O que usar no lugar
+
+**Peça um endereço pessoal.** No formulário de cadastro, mostre uma mensagem curta quando o endereço é de função: "Use o seu próprio e-mail, para os códigos chegarem a você."
+
+**Verifique o endereço antes de guardar.** O [`POST /validate`](/docs/api/validate) retorna `role: true` para uma caixa de equipe, com o veredito `risky` e o motivo `role`. Ele não envia nada:
+
+```ts
+const check = await mail.validate(email)
+
+if (check.role) {
+  return { error: "Use o seu próprio e-mail, não uma caixa de equipe." }
+}
+```
+
+**Envie de um endereço que uma pessoa lê.** Use `oi@`, `suporte@` ou o nome de uma pessoa, e coloque o `reply_to` na caixa da sua equipe:
+
+```ts
+await mail.send({
+  from: "Acme <oi@acme.com.br>",
+  replyTo: "suporte@acme.com.br",
+  to: user.email,
+  subject: "O seu recibo",
+  html: receiptHtml,
+})
+```
+
+**Dê uma saída fácil.** Ligue o **List-Unsubscribe** no domínio. O Gmail e outros mostram um botão *Cancelar inscrição* ao lado do remetente, e quem quer sair não precisa do botão de spam.
+
+## O que o 1billion faz
+
+O `POST /send` recusa um e-mail de função (`contact@`, `noreply@`) como destinatário por padrão. O destinatário recebe `422` com `check` e `address`, e nada é enviado ou cobrado.
+
+Alguns apps precisam enviar para uma caixa de equipe, por exemplo uma nota fiscal para o `financeiro@` de uma empresa. Para eles, ligue a chave que aceita e-mails de função na página do app. Aí o e-mail vai, e a escolha é sua.
+
+## Comece agora
+
+Os primeiros 100 e-mails de cada dia são grátis, todo dia: cada workspace recebe 100.000 créditos à meia-noite, sem cartão. [Entre no console](https://app.1billion.clowk.in), adicione o seu domínio e envie o seu primeiro e-mail em poucos minutos com o [quickstart](/docs/getting-started).

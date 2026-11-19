@@ -1,0 +1,61 @@
+---
+title: O que é um bounce e o que é uma reclamação
+description: Um bounce é um servidor que recusa o seu e-mail. Uma reclamação é uma pessoa que clica em "Denunciar spam". Por que os dois prejudicam o seu domínio, e o que o 1billion faz com cada um.
+date: '2026-11-19T13:00:00Z'
+author: Thadeu Esteves
+folder: concepts
+tags: [bounce, complaint, suppression, deliverability]
+cover: /blog/bounce-and-complaint/cover.png
+---
+
+Dois sinais dizem a um provedor de e-mail que um remetente é descuidado: bounces e reclamações. Eles vêm de lugares diferentes, mas os dois aumentam a chance do seu próximo e-mail ir para o spam.
+
+## Um bounce: o servidor diz não
+
+Um bounce é uma recusa do servidor do destinatário. Ele vem como uma resposta SMTP, com um código e um texto curto:
+
+```txt
+550 5.1.1 user unknown
+```
+
+O primeiro dígito diz o tipo:
+
+- **`5xx`, hard bounce:** uma falha permanente. A caixa não existe, ou o domínio não recebe e-mail. A próxima tentativa dá a mesma resposta.
+- **`4xx`, soft bounce:** uma falha temporária. A caixa está cheia, ou o servidor está ocupado. Uma tentativa depois pode passar.
+
+Um bounce também pode chegar atrasado: o servidor aceita o e-mail e depois envia uma mensagem de bounce para o remetente do envelope.
+
+Muitos hard bounces dizem ao provedor que você envia para uma lista que não mantém limpa, por exemplo uma lista comprada ou uma lista de endereços antigos.
+
+## Uma reclamação: a pessoa diz não
+
+Uma reclamação é uma pessoa que clica em **Denunciar spam** em um e-mail que recebeu. O e-mail foi entregue, mas o destinatário não queria.
+
+Alguns provedores devolvem a reclamação ao remetente em um *feedback loop*. O Gmail não diz qual pessoa reclamou, mas conta a taxa, e as regras para remetentes pedem uma taxa de spam abaixo de 0,3%.
+
+Uma reclamação vem, em geral, de uma pessoa que:
+
+- não lembra que se cadastrou,
+- não acha como parar de receber,
+- recebe mais e-mails do que esperava.
+
+## Como ter menos dos dois
+
+- **Verifique o endereço antes de guardar.** Um erro como `gmial.com` vira um hard bounce depois.
+- **Nunca envie de novo para um hard bounce.**
+- **Facilite a saída.** Quem acha o link de descadastro não clica em "Denunciar spam".
+- **Envie marketing de outro domínio.** Assim quem sai da sua newsletter continua recebendo o e-mail de login.
+
+## O que o 1billion faz
+
+**Antes do envio.** O `POST /send` verifica cada destinatário de graça: a sintaxe, um domínio que recebe e-mail, nada de caixa descartável e nada de endereço de função (`contact@`, `noreply@`). Um destinatário que falha recebe `422`, e nada é enviado ou cobrado. Você também pode chamar o [`POST /validate`](/docs/api/validate) em um formulário de cadastro, sem enviar nada.
+
+**Depois de um bounce.** A mensagem fica com o status `bounced`, e o `last_error` tem a resposta do servidor. O seu app recebe um [webhook](/docs/guides/webhooks) `bounced` com o mesmo texto em `detail`. Um hard bounce coloca o endereço na [lista de supressão](/docs/api/suppressions) do app: um novo e-mail para ele vira uma mensagem grátis com o status `suppressed`. Quando o endereço volta a funcionar, tire ele da lista com `DELETE /suppressions/{address}` ou no console.
+
+**Para as reclamações.** Ligue o **List-Unsubscribe** no domínio. Cada e-mail passa a ter os cabeçalhos de descadastro com um clique (RFC 8058), e o Gmail e outros mostram um botão *Cancelar inscrição* ao lado do remetente. Quem sai gera um webhook `unsubscribed` e para de receber e-mail só daquele domínio.
+
+**A reputação do workspace.** Quando a reputação dos últimos 30 dias fica abaixo de 90%, com 100 envios ou mais, os envios do workspace são pausados com `403`, e uma pessoa revisa. Isso evita que um remetente descuidado prejudique os outros.
+
+## Comece agora
+
+Os primeiros 100 e-mails de cada dia são grátis, todo dia: cada workspace recebe 100.000 créditos à meia-noite, sem cartão. [Entre no console](https://app.1billion.clowk.in), adicione o seu domínio e envie o seu primeiro e-mail em poucos minutos com o [quickstart](/docs/getting-started).

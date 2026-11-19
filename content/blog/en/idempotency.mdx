@@ -1,0 +1,82 @@
+---
+title: Idempotency, so that you do not send one e-mail two times
+description: A timeout does not tell you if the mail went. With an Idempotency-Key, a retry returns the first answer and sends nothing new. How to pick a good key.
+date: '2026-11-19T15:00:00Z'
+author: Thadeu Esteves
+folder: guides
+tags: [idempotency, retries, jobs]
+cover: /blog/idempotency/cover.png
+---
+
+Your app calls `POST /send`, and the network drops before the answer comes. Did the mail go? You can not know. If you try again, the customer can get two receipts. If you do not try again, the customer can get none.
+
+This is the problem that idempotency solves: **the same request, sent many times, has the effect of one**.
+
+## Where a second send comes from
+
+- **A timeout.** The request got to the server, but the answer did not get back.
+- **A job that runs again.** A worker sends the mail and crashes before it marks the job done. The queue gives the job to another worker.
+- **A function that runs again.** AWS Lambda runs a failed asynchronous invocation again.
+- **A person who clicks two times** on "Send me the code".
+
+## The Idempotency-Key header
+
+Send an `Idempotency-Key` header with `POST /send`:
+
+```http
+POST /send
+Authorization: Bearer <API key>
+Idempotency-Key: receipt-8812
+```
+
+The same key from the same app in 30 days returns the first answer, with `200` in place of `202`, and sends nothing new. So you can try again as many times as you need.
+
+## Pick a key that names the mail
+
+The key must be the same each time that you mean the **same** mail, and different for a different mail. Build it from your data:
+
+| Mail | Key |
+|---|---|
+| The receipt of an order | `receipt-<order id>` |
+| A login code | `login-<user>-<code>` |
+| The welcome mail | `welcome-<user id>` |
+| A password reset | `reset-<reset token id>` |
+
+Do not use a random value made at the time of the send. A job that runs again makes a new random value, and the mail goes again.
+
+## With the SDKs
+
+The SDKs try again 3 times in all, after a `503` or a network error, with the same key. Only those two errors are worth a retry: every other error gives the same answer the next time.
+
+If you do not pass a key, the client makes one for its own retries. That key is new on each call of your code, so it does not protect you from a job that runs again. For that, pass your own key:
+
+```ts
+await mail.send({
+  from: "Acme <hi@acme.com>",
+  to: order.email,
+  subject: "Your receipt",
+  html: receiptHtml,
+  idempotencyKey: `receipt-${order.id}`,
+})
+```
+
+```ruby
+OneBillion::Emails.send(
+  { from: "Acme <hi@acme.com>", to: order.email, subject: "Your receipt", html: receipt_html },
+  { idempotency_key: "receipt-#{order.id}" }
+)
+```
+
+```go
+client.Send(ctx, mail, onebillion.IdempotencyKey("receipt-"+order.ID))
+```
+
+With Action Mailer, the Ruby gem uses the `Message-ID` of the mail as the key, so a `deliver_later` job that runs again sends nothing new.
+
+## The same idea on the other side
+
+Webhooks have the same problem, in the other direction: 1billion sends each event at least once, so your app can get the same event two times. Keep the `id` of each event, and skip the ones that you already handled. See [Delivery webhooks in practice](/blog/delivery-webhooks/).
+
+## Start now
+
+The first 100 mails of each day are free, every day: each workspace gets 100,000 credits at midnight, with no card. [Log in to the console](https://app.1billion.clowk.in), add your domain, and send your first mail in a few minutes with the [quickstart](/docs/getting-started).

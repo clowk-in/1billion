@@ -1,0 +1,61 @@
+---
+title: What a bounce is and what a complaint is
+description: A bounce is a server that refuses your mail. A complaint is a person who clicks "Report spam". Why both hurt your domain, and what 1billion does with each one.
+date: '2026-11-19T13:00:00Z'
+author: Thadeu Esteves
+folder: concepts
+tags: [bounce, complaint, suppression, deliverability]
+cover: /blog/bounce-and-complaint/cover.png
+---
+
+Two signals tell a mailbox provider that a sender is careless: bounces and complaints. They come from different places, but both make your next mail more likely to go to spam.
+
+## A bounce: the server says no
+
+A bounce is a refusal from the server of the recipient. It comes as an SMTP answer, with a code and a short text:
+
+```txt
+550 5.1.1 user unknown
+```
+
+The first digit tells the type:
+
+- **`5xx`, a hard bounce:** a permanent failure. The mailbox does not exist, or the domain does not take mail. The next try gives the same answer.
+- **`4xx`, a soft bounce:** a temporary failure. The mailbox is full, or the server is busy. A later try can pass.
+
+A bounce can also come late: the server accepts the mail and then sends a bounce message to the envelope sender.
+
+Many hard bounces tell the provider that you send to a list that you do not keep clean, for example a list that you bought or a list of old addresses.
+
+## A complaint: the person says no
+
+A complaint is a person who clicks **Report spam** on a mail that they got. The mail was delivered, but the recipient did not want it.
+
+Some providers send the complaint back to the sender in a *feedback loop*. Gmail does not tell you which person complained, but it counts the rate, and its sender guidelines ask you to keep the spam rate under 0.3%.
+
+A complaint usually comes from a person who:
+
+- does not remember that they signed up,
+- can not find how to stop the mail,
+- gets more mail than they expected.
+
+## How to have fewer of both
+
+- **Check an address before you keep it.** A typo such as `gmial.com` becomes a hard bounce later.
+- **Never send again to a hard bounce.**
+- **Make it easy to leave.** A person who finds an unsubscribe link does not click "Report spam".
+- **Send marketing from another domain.** Then a person who leaves your newsletter still gets your login mail.
+
+## What 1billion does
+
+**Before the send.** `POST /send` checks each recipient for free: the syntax, a domain that receives mail, no disposable inbox and no role address (`contact@`, `noreply@`). A recipient that fails gets `422`, and nothing is sent or charged. You can also call [`POST /validate`](/docs/api/validate) on a sign-up form, and send nothing.
+
+**After a bounce.** The message gets the status `bounced`, and `last_error` has the answer of the server. Your app gets a `bounced` [webhook](/docs/guides/webhooks) with the same text in `detail`. A hard bounce puts the address on the [suppression list](/docs/api/suppressions) of the app: a new mail to it becomes a free message with the status `suppressed`. When the address works again, take it off with `DELETE /suppressions/{address}` or in the console.
+
+**For complaints.** Turn on **List-Unsubscribe** on the domain. Each mail then has the one-click unsubscribe headers (RFC 8058), so Gmail and others show an *Unsubscribe* button next to the sender. A person who leaves gives an `unsubscribed` webhook, and stops getting mail from that domain only.
+
+**The reputation of the workspace.** When the reputation of the last 30 days is under 90%, with 100 sends or more, the sends of the workspace are paused with `403`, and a person reviews it. This keeps one careless sender from hurting the others.
+
+## Start now
+
+The first 100 mails of each day are free, every day: each workspace gets 100,000 credits at midnight, with no card. [Log in to the console](https://app.1billion.clowk.in), add your domain, and send your first mail in a few minutes with the [quickstart](/docs/getting-started).

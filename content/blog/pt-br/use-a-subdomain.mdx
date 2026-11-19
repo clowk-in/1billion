@@ -1,0 +1,59 @@
+---
+title: Use um subdomínio e proteja o seu domínio
+description: Os provedores de e-mail julgam o domínio que envia. Envie de mail.acme.com e news.acme.com, e uma semana ruim de marketing não coloca o e-mail de login de acme.com no spam.
+date: '2026-11-19T18:00:00Z'
+author: Thadeu Esteves
+folder: guides
+tags: [subdomain, reputation, dns, deliverability]
+cover: /blog/use-a-subdomain/cover.png
+---
+
+O Gmail, o Outlook e os outros provedores guardam uma **reputação** para cada domínio que envia e-mail. Cada bounce, cada reclamação e cada e-mail que ninguém abre faz ela cair. Quando ela está baixa, o seu e-mail vai para o spam.
+
+O problema: se você envia tudo de `acme.com`, tudo divide uma reputação só. O e-mail da sua empresa, as notas, os códigos de login e a newsletter. Uma campanha de que as pessoas não gostam, e a troca de senha dos seus clientes vai para o spam junto.
+
+## Um subdomínio tem a sua própria reputação
+
+O DKIM assina cada e-mail com um domínio (o `d=` da assinatura), e os provedores acompanham a reputação desse domínio. Quando você envia de `mail.acme.com`, o e-mail é assinado por `mail.acme.com`, então ele constrói uma reputação própria.
+
+Não é um muro. Os provedores ainda veem que `mail.acme.com` pertence a `acme.com`, e um subdomínio muito ruim ainda pode prejudicar o domínio pai. Mas o estrago de um fluxo fica, quase todo, naquele fluxo, e o e-mail do domínio raiz, como o e-mail da sua equipe no Google Workspace, mantém o seu próprio histórico.
+
+## Separe o e-mail por tipo
+
+Use um subdomínio para cada tipo de e-mail:
+
+| Subdomínio | E-mail | Por quê |
+|---|---|---|
+| `mail.acme.com` | Códigos de login, troca de senha, recibos | As pessoas esperam por ele. Tem que chegar sempre. |
+| `news.acme.com` | Newsletter, novidades, promoções | Mais gente ignora ou denuncia. |
+| `acme.com` | O e-mail da sua equipe | Os outros dois não mexem nele. |
+
+Assim uma newsletter com muitas reclamações derruba a reputação de `news.acme.com`, e o código de login de `mail.acme.com` continua chegando.
+
+Tem mais um motivo para separar. No 1billion, quem clica em *Cancelar inscrição* para de receber e-mail só daquele domínio. Se a newsletter e o e-mail de login dividem um domínio, quem sai da newsletter também para de receber o login. Com dois subdomínios, a pessoa sai só da newsletter.
+
+## O From continua mostrando a sua marca
+
+A pessoa vê `Acme <oi@mail.acme.com>`. O nome da marca vem primeiro, e o domínio é claramente seu. Coloque o `reply_to` em uma caixa que você lê, por exemplo `suporte@acme.com`, para as respostas chegarem à sua equipe.
+
+O DMARC continua passando: o domínio do DKIM e o domínio do `From` são o mesmo (`mail.acme.com`). Se o subdomínio não tem um registro DMARC próprio, o DMARC de `acme.com` vale para ele, com a tag `sp=` do domínio pai.
+
+## Configure no 1billion
+
+1. Adicione `mail.acme.com` como domínio do seu app no [console](https://app.1billion.clowk.in).
+2. Adicione os registros que o console mostra. No campo Nome da maioria dos provedores de DNS, digite o nome **relativo**, por exemplo `1billion._domainkey.mail`, não o nome completo.
+3. Ou use a configuração com um clique para Cloudflare ou Amazon Route 53, e o console adiciona os registros para você.
+
+| Tipo | Nome completo | O quê |
+|---|---|---|
+| TXT | `1billion._domainkey.mail.acme.com` | A chave pública DKIM |
+| CNAME | `1billion.mail.acme.com` | O nosso return path, que tem o SPF e o MX |
+| TXT | `_dmarc.mail.acme.com` | Opcional: uma política DMARC própria |
+
+O subdomínio não precisa de caixa de entrada para enviar. O passo a passo para cada provedor de DNS, e como receber respostas em um subdomínio, está em [Envie de um subdomínio](/docs/guides/subdomains).
+
+O primeiro domínio de um workspace é grátis. Cada domínio depois do primeiro custa 1.000.000 de créditos, uma vez. Veja [Créditos](/docs/guides/credits).
+
+## Comece agora
+
+Os primeiros 100 e-mails de cada dia são grátis, todo dia: cada workspace recebe 100.000 créditos à meia-noite, sem cartão. [Entre no console](https://app.1billion.clowk.in), adicione o seu domínio e envie o seu primeiro e-mail em poucos minutos com o [quickstart](/docs/getting-started).

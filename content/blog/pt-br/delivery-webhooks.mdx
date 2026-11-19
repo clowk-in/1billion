@@ -1,0 +1,117 @@
+---
+title: Webhooks de entrega na prática
+description: O envio responde "accepted", e o resultado chega depois como um webhook assinado. Como verificar a assinatura, ignorar um evento repetido e agir em um bounce.
+date: '2026-11-19T14:00:00Z'
+author: Thadeu Esteves
+folder: guides
+tags: [webhook, bounce, signature, nextjs]
+cover: /blog/delivery-webhooks/cover.png
+---
+
+O `POST /send` responde `202` com o status `accepted`: o 1billion tem o e-mail. A entrega acontece depois, com as suas próprias tentativas, e pode levar segundos ou, com um servidor lento, bem mais. Então o resultado não vem na resposta. Ele vem como um **webhook**: um `POST` assinado do 1billion para o seu app, um para cada mensagem que termina.
+
+## 1. Configure a URL
+
+Abra a página do app no [console](https://app.1billion.clowk.in) e configure a URL do webhook, por exemplo `https://acme.com/api/webhooks/1billion`. Copie o segredo do webhook da mesma página e coloque no ambiente:
+
+```bash
+export ONEBILLION_WEBHOOK_SECRET=<o seu segredo do webhook>
+```
+
+## 2. Conheça os eventos
+
+Cada evento é um JSON pequeno:
+
+```json
+{
+  "id": "4a1e…",
+  "type": "bounced",
+  "message_id": "9f2c…",
+  "to": "jane@example.com",
+  "detail": "mx.example.com: 550 5.1.1 user unknown",
+  "created_at": "2026-10-30T12:00:03Z"
+}
+```
+
+| `type` | Quando |
+|---|---|
+| `delivered` | O servidor do destinatário aceitou o e-mail. |
+| `bounced` | O servidor do destinatário recusou. `detail` tem a resposta dele. |
+| `unsubscribed` | Uma pessoa saiu do domínio com o descadastro de um clique. `detail` tem o domínio, e `message_id` vem vazio. |
+| `test` | O botão de teste da página Webhooks. Responda 2xx e ignore. |
+
+Você pode desligar cada tipo, para cada app, na página Webhooks. Um tipo novo de evento fica ligado até você desligar.
+
+## 3. Verifique a assinatura
+
+Qualquer um pode enviar um `POST` para a sua URL, então verifique que o evento vem do 1billion. Cada evento tem os cabeçalhos `1B-Event-Id`, `1B-Timestamp` e `1B-Signature`. A assinatura é o HMAC-SHA256 de `<timestamp>.<corpo cru>` com o seu segredo.
+
+O SDK faz a verificação em uma chamada. Em uma rota do Next.js:
+
+```ts
+// app/api/webhooks/1billion/route.ts
+import { OneBillion } from "@clowk/1billion"
+
+export async function POST(request: Request) {
+  let event
+
+  try {
+    event = OneBillion.verifySignature({ payload: await request.text(), headers: request.headers })
+  } catch {
+    return new Response(null, { status: 401 })
+  }
+
+  await handle(event)
+
+  return new Response(null, { status: 204 })
+}
+```
+
+Duas regras:
+
+- **Use o corpo cru.** Verifique o texto exatamente como chegou, antes de fazer o parse. Um corpo que você faz parse e escreve de novo é outra string, e a assinatura falha.
+- **Recuse um timestamp antigo.** O SDK recusa um timestamp com mais de 5 minutos, então um evento copiado não pode ser enviado de novo depois.
+
+O [guia de Webhooks](/docs/guides/webhooks) tem a mesma verificação em Ruby e em Go, e na mão para qualquer linguagem.
+
+## 4. Trate cada evento uma vez
+
+A entrega é **pelo menos uma vez**: um problema de rede pode trazer o mesmo evento duas vezes. Guarde o `id` de cada evento que você tratou e pule os que já conhece:
+
+```ts
+async function handle(event: WebhookEvent) {
+  const isNew = await db.webhookEvents.insertIfAbsent(event.id)
+
+  if (!isNew) return
+
+  switch (event.type) {
+    case "bounced":
+      await db.users.markEmailBounced(event.to, event.detail)
+      break
+
+    case "unsubscribed":
+      await db.users.unsubscribe(event.to, event.detail)
+      break
+
+    case "delivered":
+      await db.messages.markDelivered(event.message_id)
+      break
+  }
+}
+```
+
+Um índice único no id do evento basta para o `insertIfAbsent`.
+
+## 5. Responda rápido
+
+Responda `2xx` assim que o evento estiver seguro no seu banco. Qualquer outro status é tentado de novo com backoff, por até 48 horas. Se o seu trabalho é lento, coloque o evento em uma fila de jobs e responda primeiro.
+
+Um evento que falhou aparece na página Webhooks, com um botão para enviar de novo. A nova tentativa é um evento novo, com um `id` novo.
+
+## O que fazer com um bounce
+
+Um hard bounce já coloca o endereço na lista de supressão do app, então o 1billion não envia para ele de novo. O webhook é para o seu lado: mostre "este e-mail não funciona" para o usuário e peça um endereço novo. Quando o usuário corrigir, tire o endereço antigo com `DELETE /suppressions/{address}`.
+
+## Comece agora
+
+Os primeiros 100 e-mails de cada dia são grátis, todo dia: cada workspace recebe 100.000 créditos à meia-noite, sem cartão. [Entre no console](https://app.1billion.clowk.in), adicione o seu domínio e envie o seu primeiro e-mail em poucos minutos com o [quickstart](/docs/getting-started).

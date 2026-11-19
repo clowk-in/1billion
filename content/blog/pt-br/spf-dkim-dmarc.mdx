@@ -1,0 +1,78 @@
+---
+title: 'SPF, DKIM e DMARC: o que são'
+description: Três registros de DNS dizem ao provedor de e-mail que uma mensagem vem mesmo do seu domínio. O que cada um verifica, como trabalham juntos e como o 1billion configura tudo.
+date: '2026-11-19T12:00:00Z'
+author: Thadeu Esteves
+folder: concepts
+tags: [dns, spf, dkim, dmarc, deliverability]
+cover: /blog/spf-dkim-dmarc/cover.png
+---
+
+Qualquer um pode escrever `From: hi@acme.com` em um e-mail. O SMTP não verifica isso. Por isso o Gmail, o Outlook e os outros provedores olham três registros de DNS para saber se um e-mail vem mesmo de `acme.com`: SPF, DKIM e DMARC.
+
+## SPF: quais servidores podem enviar
+
+O SPF (Sender Policy Framework) é um registro TXT com a lista dos servidores que podem enviar e-mail por um domínio:
+
+```txt
+v=spf1 include:_spf.example.net -all
+```
+
+O servidor que recebe lê o domínio do **remetente do envelope** (o `MAIL FROM` da conversa SMTP, também chamado de return path), busca o SPF dele e verifica o IP que conectou. Se o IP não está na lista, o SPF falha.
+
+O SPF tem dois limites:
+
+- Ele verifica o remetente do envelope, não o `From` que a pessoa vê.
+- Ele quebra quando o e-mail é encaminhado, porque quem encaminha tem outro IP.
+
+## DKIM: uma assinatura no e-mail
+
+O DKIM (DomainKeys Identified Mail) assina cada e-mail. O servidor que envia faz um hash do corpo e de alguns cabeçalhos e assina com uma chave privada. O resultado vai no cabeçalho `DKIM-Signature`:
+
+```txt
+DKIM-Signature: v=1; a=rsa-sha256; d=acme.com; s=1billion; h=From:To:Subject:Date; bh=…; b=…
+```
+
+`d` é o domínio e `s` é o seletor. O servidor que recebe lê a chave pública em `<seletor>._domainkey.<domínio>` e verifica a assinatura. Se alguém muda o corpo ou um cabeçalho assinado no caminho, o DKIM falha.
+
+A assinatura DKIM continua no e-mail quando ele é encaminhado. Por isso o DKIM é o mais forte dos três.
+
+## DMARC: a regra que junta os dois
+
+SPF e DKIM não olham o `From` que a pessoa vê. O DMARC (Domain-based Message Authentication, Reporting and Conformance) fecha esse buraco. É um registro TXT em `_dmarc.<domínio>`:
+
+```txt
+v=DMARC1; p=none; rua=mailto:dmarc@acme.com
+```
+
+O DMARC passa quando o SPF ou o DKIM passa **e** o domínio dele bate com o domínio do `From`. Isso se chama *alinhamento*. No alinhamento relaxado (o padrão), um subdomínio também bate: `mail.acme.com` alinha com `acme.com`.
+
+O `p` diz ao servidor o que fazer com um e-mail que falha:
+
+| `p` | O que o servidor faz |
+|---|---|
+| `none` | Nada. Só envia relatórios para o `rua`. |
+| `quarantine` | Coloca o e-mail no spam. |
+| `reject` | Recusa o e-mail. |
+
+Comece com `p=none`, leia os relatórios e passe para `quarantine` ou `reject` quando todos os seus remetentes passarem.
+
+## Como o 1billion configura
+
+Quando você adiciona um domínio a um app no console, ele mostra estes registros:
+
+| Tipo | Nome | O quê |
+|---|---|---|
+| TXT | `1billion._domainkey.<domínio>` | A chave pública DKIM |
+| CNAME | `1billion.<domínio>` | O nosso return path, que tem o SPF e o MX |
+| TXT | `_dmarc.<domínio>` | Uma política DMARC, por exemplo `v=DMARC1; p=none;` |
+
+- **DKIM:** o 1billion assina cada e-mail com a chave privada do seu domínio. A chave fica criptografada e nunca sai dos nossos servidores.
+- **SPF:** o remetente do envelope é `bounces+<id da mensagem>@1billion.<seu domínio>`. O CNAME aponta esse nome para o nosso host, então o SPF passa e alinha com o seu domínio. Quando os nossos servidores mudam, só os nossos registros mudam: você nunca mais edita o seu DNS.
+- **DMARC:** não é obrigatório, mas os provedores confiam mais em um domínio com DMARC. O console mostra um aviso quando ele falta.
+
+O console verifica os registros para você, e o domínio pode enviar quando DKIM, SPF e MX passam. A tabela completa está em [Domínios e DNS](/docs/guides/domains).
+
+## Comece agora
+
+Os primeiros 100 e-mails de cada dia são grátis, todo dia: cada workspace recebe 100.000 créditos à meia-noite, sem cartão. [Entre no console](https://app.1billion.clowk.in), adicione o seu domínio e envie o seu primeiro e-mail em poucos minutos com o [quickstart](/docs/getting-started).
