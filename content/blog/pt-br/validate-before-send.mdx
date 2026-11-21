@@ -1,0 +1,96 @@
+---
+title: 'Valide um endereço antes de enviar: o /validate já vem junto'
+description: O POST /validate dá o veredito de um endereço, a nota e o motivo, sem outro serviço para pagar. Como ele se compara a um validador separado como o Kickbox, como chamar e quanto custa em créditos.
+date: '2026-11-21T12:00:00Z'
+author: Thadeu Esteves
+folder: guides
+tags: [validation, api, credits, deliverability]
+cover: /blog/validate-before-send/cover.png
+---
+
+Um endereço ruim custa duas vezes. O e-mail volta, e cada bounce diz ao Gmail e ao Outlook que você não limpa a sua lista. Erros de digitação (`gmial.com`), caixas temporárias e robôs de cadastro enchem a sua base de endereços assim.
+
+A resposta comum é um **serviço de validação**. O 1billion tem um embutido: o [`POST /validate`](/docs/api/validate).
+
+## Um validador separado, ou um embutido
+
+Muitas equipes adicionam um validador dedicado, como o **Kickbox**, ao lado do serviço que envia os e-mails. Funciona, mas é mais um de cada:
+
+- **Mais uma conta e mais uma fatura**, com preços e créditos próprios.
+- **Mais uma chave de API** para guardar em segredo, e mais um SDK na sua aplicação.
+- **Mais um lugar para olhar**: o validador não sabe nada dos e-mails que você enviou, e quem envia não sabe nada da validação.
+
+No 1billion, a validação está na mesma API, com a mesma chave, o mesmo SDK e os mesmos créditos. E por ser o mesmo serviço, ele sabe algo que um validador separado não sabe: **o que o seu workspace já viu deste endereço**. Se um e-mail para ele voltou nos últimos 30 dias, o veredito é `undeliverable` (`bounced_before`). Se um e-mail para ele foi entregue, o veredito é `deliverable` (`delivered_before`).
+
+Mais uma diferença: o `/validate` **nunca pergunta ao servidor do destinatário**. Alguns validadores abrem uma conexão SMTP e testam a caixa com `RCPT TO`. Num IP compartilhado, esse teste parece um spammer testando endereços, e prejudica a reputação de todos que enviam por aquele IP. O 1billion usa só o endereço, o DNS e o seu histórico.
+
+## O veredito
+
+```bash
+curl https://api.1billion.clowk.in/validate \
+  -H "Authorization: Bearer $ONEBILLION_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "address": "joao@gmial.com" }'
+```
+
+A resposta tem três campos principais:
+
+| `result` | `reason` | `score` |
+|---|---|---|
+| `undeliverable` | `invalid_syntax`, `no_mail_server`, `suppressed`, `bounced_before` | 0 |
+| `risky` | `disposable` (0.2), `possible_typo` (0.3), `looks_generated` (0.4), `role` (0.5) | 0.2 a 0.5 |
+| `deliverable` | `delivered_before` (1.0), `mail_server_found` (0.9) | 0.9 a 1 |
+
+O motivo mais forte vence, na ordem da tabela. Um subendereço (`joao+1@`) tira 0.1 da nota.
+
+Ela também traz os sinais um a um: `did_you_mean` (a correção de um erro de digitação de um provedor gratuito), `free`, `disposable`, `role`, `generated` (um nome que parece feito por robô), `mx_found`, `suppressed` e `history`.
+
+## Num formulário de cadastro
+
+O melhor lugar para validar é o momento em que a pessoa digita o endereço. Assim ela pode corrigir, e o endereço ruim nunca entra na sua base:
+
+```ts
+import { OneBillion } from "@clowk/1billion"
+
+const mail = new OneBillion()
+
+export async function checkEmail(email: string) {
+  const v = await mail.validate(email)
+
+  if (v.did_you_mean) {
+    return { hint: `Você quis dizer ${v.did_you_mean}?` }
+  }
+
+  if (v.result === "undeliverable") {
+    return { error: "Este endereço não recebe e-mail." }
+  }
+
+  if (v.disposable || v.role) {
+    return { error: "Use o seu próprio e-mail, não um temporário ou de equipe." }
+  }
+
+  return { ok: true }
+}
+```
+
+A mesma chamada está nos outros SDKs: `OneBillion.client.validate(email)` em Ruby, e `client.Validate(ctx, email)` em Go.
+
+## No console, sem código
+
+O console tem a página **Validação**. Digite um endereço e veja o veredito, a nota, cada sinal e cada checagem, com o motivo em palavras. Ela também lista as validações dos últimos 30 dias. É ótima para o suporte: um cliente diz que "o e-mail nunca chegou", e você confere o endereço em segundos.
+
+## Quanto custa
+
+Uma validação custa **100 créditos**, debitados antes da checagem. Com menos que isso, a resposta é `429`, como no `/send`. A página do console custa o mesmo que a API.
+
+Para comparar: um e-mail custa 1.000 créditos, então uma validação é um décimo de um e-mail. Os créditos grátis de cada dia são 100.000, então pagam até 1.000 validações por dia. Um pacote de créditos (1 bilhão de créditos, R$ 59,99, sem mensalidade) paga 10 milhões de validações. Veja [Créditos](/docs/guides/credits).
+
+## Preciso validar antes de cada envio?
+
+Não. O `POST /send` já faz, **sem custo**, as checagens que recusam um e-mail, em cada destinatário: a sintaxe, se o domínio recebe e-mail, se não é descartável e se não é um e-mail de função. Um destinatário que falha recebe `422` com `check` e `address`, e nada é enviado nem cobrado.
+
+Então use o `/validate` onde ele agrega: no formulário de cadastro, para pegar erros de digitação enquanto a pessoa está ali, e numa lista importada, antes da primeira campanha para ela. Em cada envio normal, o `/send` já protege você sozinho.
+
+## Comece agora
+
+Os primeiros 100 e-mails de cada dia são grátis, todos os dias: cada workspace recebe 100.000 créditos à meia-noite, sem cartão. [Entre no console](https://app.1billion.clowk.in), adicione o seu domínio e envie o seu primeiro e-mail em poucos minutos com o [guia rápido](/docs/getting-started).
