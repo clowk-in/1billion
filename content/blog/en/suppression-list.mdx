@@ -1,0 +1,63 @@
+---
+title: 'What a suppression list is, and when to take an address off it'
+description: The suppression list keeps the addresses that bounced, so you do not send to them again. How it protects your domain, what a suppressed mail costs, and when it is safe to remove an address.
+date: '2026-11-21T15:00:00Z'
+author: Thadeu Esteves
+folder: concepts
+tags: [suppression, bounce, deliverability, api]
+cover: /blog/suppression-list/cover.png
+---
+
+A **suppression list** is a list of addresses that you must not send to. When an address goes on it, the service stops each new mail to that address before it leaves.
+
+It sounds like a small feature. It is one of the most important parts of good deliverability.
+
+## Why it exists
+
+When a server refuses a mail with a **hard bounce** (`5.1.1 user unknown`, or a domain that does not exist), the address is not a good address. It will not start to work tomorrow.
+
+But your app does not know that. The address is still in your database. The next receipt, the next alert and the next news go to it again, and each one bounces again.
+
+Each bounce tells Gmail and Outlook that you send to addresses that you never cleaned. A high bounce rate moves **all** your mail toward spam, also the mail to your good customers. (See [what a bounce is and what a complaint is](/blog/bounce-and-complaint).)
+
+The suppression list breaks that loop: one bounce, and the address is stopped.
+
+## How it works in 1billion
+
+- **A hard bounce adds the address.** The message gets the status `bounced`, your app gets a `bounced` [webhook](/docs/guides/webhooks), and the address goes on the suppression list.
+- **The list is per app.** Each app of the workspace has its own list. A bounce in one product does not stop the mail of another.
+- **A suppressed mail costs nothing.** A new mail to the address becomes a message with the status `suppressed`. Nothing is sent, and no credit is used.
+- **`/validate` knows it.** A suppressed address gets the verdict `undeliverable` with the reason `suppressed`.
+
+Use the `bounced` webhook to mark the address in your own database, and ask the person for a new one on the next login.
+
+## When to take an address off
+
+Take an address off the list only when you know that it **works again**. For example:
+
+- **The person fixed it.** A customer writes to support: "I did not get my receipt". The inbox was full or the company mail server was down, and now it works.
+- **The domain came back.** A company let its domain expire, then renewed it.
+- **It was a mistake on the server side.** A server of the recipient refused good addresses for some hours, for a bad setup, and fixed it.
+
+Do **not** take addresses off the list in bulk, and do not take one off "to try again". If the address still does not exist, it bounces again, and you pay for that bounce with your reputation.
+
+## How to take it off
+
+With the API:
+
+```bash
+curl -X DELETE https://api.1billion.clowk.in/suppressions/jane%40example.com \
+  -H "Authorization: Bearer $ONEBILLION_API_KEY"
+```
+
+Encode the `@` as `%40`. The answer is `204`, or `404` when the address is not on the list. The SDKs have the same call:
+
+```ts
+await mail.unsuppress("jane@example.com")
+```
+
+Or, with no code: open the **Suppressions** page of the app in the console, and remove the address there.
+
+## Start now
+
+The first 100 mails of each day are free, every day: each workspace gets 100,000 credits at midnight, with no card. [Log in to the console](https://app.1billion.clowk.in), add your domain, and send your first mail in a few minutes with the [quickstart](/docs/getting-started).

@@ -1,0 +1,61 @@
+---
+title: 'Shared IP or dedicated IP: and why we never send an RCPT TO test'
+description: Every mail leaves from an IP, and mailbox providers keep a reputation for each one. What a shared IP and a dedicated IP are, which one fits your volume, and why a mailbox test with RCPT TO burns a shared IP.
+date: '2026-11-21T14:00:00Z'
+author: Thadeu Esteves
+folder: concepts
+tags: [ip, reputation, deliverability, smtp, validation]
+cover: /blog/shared-vs-dedicated-ip/cover.png
+---
+
+Every mail leaves from a server with an IP address. Gmail, Outlook and the other providers keep a **reputation** for each IP: how much mail it sends, how much of it bounces, and how many people click **Report spam**. With a good reputation, your mail goes to the inbox. With a bad one, it goes to spam, or the server refuses it.
+
+The reputation of your **domain** counts too (see [SPF, DKIM and DMARC](/blog/spf-dkim-dmarc)). But the IP is the first thing that the server of the recipient sees.
+
+## A shared IP
+
+On a shared IP, many senders send from the same addresses. This is the usual setup of an e-mail API.
+
+- **The good side:** the IP is already warm. It sends mail every day, so the providers know it. A new sender with low volume gets a good reputation on the first day.
+- **The risk:** one careless sender hurts all of them. A sender who mails an old list, with many bounces and complaints, moves the IP toward spam for everyone.
+
+So the work of the service is to **protect the IP**: to stop bad mail before it leaves.
+
+## A dedicated IP
+
+A dedicated IP sends only your mail. Your reputation is yours alone.
+
+- **The good side:** no other sender can hurt you.
+- **The cost:** a new IP has no reputation. You must **warm it up**: start with tens of mails a day, and increase slowly over weeks. And it needs volume: an IP that sends little mail, or sends at random times, never builds a reputation.
+
+A dedicated IP makes sense for a large and regular volume. For a product that sends sign-up codes, receipts and alerts, a well-kept shared IP is usually the better choice.
+
+## Why we never send an RCPT TO test
+
+Many address validators do an **SMTP check**: they connect to the server of the recipient and start a mail, but never send it:
+
+```text
+HELO validator.example
+MAIL FROM:<check@validator.example>
+RCPT TO:<jane@example.com>
+250 OK            ← "the mailbox exists"
+QUIT
+```
+
+On a shared IP, this is a bad idea:
+
+- **It looks like a spammer.** A spammer tests lists of addresses in the same way, to find the ones that exist. Many open connections with `RCPT TO` and no mail is a known pattern, and the providers block it.
+- **The answer is not true.** Many servers say `250 OK` to every address (catch-all), and the large providers often hide the answer, to stop that same spammer.
+- **Everyone pays.** If the IP gets a block, the mail of every sender on it suffers, not only the mail of the one that tested.
+
+So [`POST /validate`](/docs/api/validate) **never asks the server of the recipient**. It uses only what it can know with no risk: the syntax, the DNS of the domain (MX), the list of disposable domains, role addresses, typos of free providers, the suppression list, and what your workspace saw of the address in the last 30 days.
+
+## How 1billion protects the IP
+
+- **Checks before each send.** `POST /send` refuses, for free, a recipient with a bad syntax, a domain that does not receive mail, a disposable domain or a role address (`422`).
+- **The suppression list.** A hard bounce puts the address on the [suppression list](/blog/suppression-list) of the app, and 1billion does not send to it again.
+- **A bad address costs more.** A mail to an address that does not exist costs 2,000 credits, two times a good mail. A mail blocked for our reputation (`5.7.x`) costs nothing: we pay it back. See [Credits](/docs/guides/credits).
+
+## Start now
+
+The first 100 mails of each day are free, every day: each workspace gets 100,000 credits at midnight, with no card. [Log in to the console](https://app.1billion.clowk.in), add your domain, and send your first mail in a few minutes with the [quickstart](/docs/getting-started).

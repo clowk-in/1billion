@@ -1,0 +1,63 @@
+---
+title: 'O que é uma lista de supressão, e quando tirar um endereço dela'
+description: A lista de supressão guarda os endereços que voltaram como bounce, para você não enviar para eles de novo. Como ela protege o seu domínio, quanto custa um e-mail suprimido, e quando é seguro tirar um endereço.
+date: '2026-11-21T15:00:00Z'
+author: Thadeu Esteves
+folder: concepts
+tags: [suppression, bounce, deliverability, api]
+cover: /blog/suppression-list/cover.png
+---
+
+Uma **lista de supressão** é uma lista de endereços para os quais você não deve enviar. Quando um endereço entra nela, o serviço barra cada novo e-mail para ele antes que saia.
+
+Parece um recurso pequeno. É uma das partes mais importantes de uma boa entregabilidade.
+
+## Por que ela existe
+
+Quando um servidor recusa um e-mail com um **hard bounce** (`5.1.1 user unknown`, ou um domínio que não existe), o endereço não é um endereço bom. Ele não vai começar a funcionar amanhã.
+
+Mas a sua aplicação não sabe disso. O endereço continua no seu banco. O próximo recibo, o próximo alerta e a próxima novidade vão para ele de novo, e cada um volta de novo.
+
+Cada bounce diz ao Gmail e ao Outlook que você envia para endereços que nunca limpou. Uma taxa alta de bounce leva **todo** o seu e-mail para o spam, também o e-mail para os seus bons clientes. (Veja [o que é bounce e o que é reclamação](/pt-br/blog/bounce-and-complaint).)
+
+A lista de supressão quebra esse ciclo: um bounce, e o endereço é barrado.
+
+## Como funciona no 1billion
+
+- **Um hard bounce adiciona o endereço.** A mensagem fica com o status `bounced`, a sua aplicação recebe um [webhook](/docs/guides/webhooks) `bounced`, e o endereço entra na lista de supressão.
+- **A lista é por app.** Cada app do workspace tem a sua lista. Um bounce num produto não barra o e-mail de outro.
+- **Um e-mail suprimido não custa nada.** Um novo e-mail para o endereço vira uma mensagem com o status `suppressed`. Nada é enviado, e nenhum crédito é usado.
+- **O `/validate` sabe.** Um endereço suprimido recebe o veredito `undeliverable` com o motivo `suppressed`.
+
+Use o webhook `bounced` para marcar o endereço no seu banco, e peça um novo à pessoa no próximo login.
+
+## Quando tirar um endereço
+
+Tire um endereço da lista só quando você sabe que ele **funciona de novo**. Por exemplo:
+
+- **A pessoa corrigiu.** Um cliente escreve ao suporte: "não recebi o meu recibo". A caixa estava cheia ou o servidor da empresa estava fora, e agora funciona.
+- **O domínio voltou.** Uma empresa deixou o domínio expirar, e depois renovou.
+- **Foi um erro do outro lado.** Um servidor do destinatário recusou endereços bons por algumas horas, por uma configuração errada, e corrigiu.
+
+**Não** tire endereços da lista em massa, e não tire um "para tentar de novo". Se o endereço ainda não existe, ele volta de novo, e você paga esse bounce com a sua reputação.
+
+## Como tirar
+
+Com a API:
+
+```bash
+curl -X DELETE https://api.1billion.clowk.in/suppressions/joao%40example.com \
+  -H "Authorization: Bearer $ONEBILLION_API_KEY"
+```
+
+Codifique o `@` como `%40`. A resposta é `204`, ou `404` quando o endereço não está na lista. Os SDKs têm a mesma chamada:
+
+```ts
+await mail.unsuppress("joao@example.com")
+```
+
+Ou, sem código: abra a página **Supressões** do app no console e remova o endereço ali.
+
+## Comece agora
+
+Os primeiros 100 e-mails de cada dia são grátis, todos os dias: cada workspace recebe 100.000 créditos à meia-noite, sem cartão. [Entre no console](https://app.1billion.clowk.in), adicione o seu domínio e envie o seu primeiro e-mail em poucos minutos com o [guia rápido](/docs/getting-started).

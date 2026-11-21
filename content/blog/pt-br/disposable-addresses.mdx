@@ -1,0 +1,57 @@
+---
+title: 'E-mails descartáveis: o que são e por que prejudicam a sua lista'
+description: Um e-mail descartável é uma caixa temporária que vive minutos ou dias. Por que pessoas e robôs usam, o que eles fazem com os seus bounces e os seus números, e como o 1billion encontra cada um.
+date: '2026-11-21T13:00:00Z'
+author: Thadeu Esteves
+folder: concepts
+tags: [disposable, validation, deliverability, sign-up]
+cover: /blog/disposable-addresses/cover.png
+---
+
+Um **e-mail descartável** é uma caixa temporária. A pessoa abre um site de e-mail temporário, recebe um endereço como `x7k2@algum-temp-mail.com`, usa no seu formulário de cadastro, lê o código e vai embora. Depois de alguns minutos ou dias, a caixa some.
+
+Existem milhares desses domínios, e novos aparecem todo dia.
+
+## Por que as pessoas usam
+
+- **Para passar de uma barreira.** O seu produto pede um e-mail para liberar um teste, um download ou um cupom. A pessoa quer a coisa, não o seu e-mail.
+- **Para ganhar o plano grátis de novo.** Um endereço novo dá uma conta nova, um teste novo ou um cupom novo.
+- **Robôs.** Robôs de cadastro e scripts de spam usam caixas temporárias porque não custam nada e não deixam rastro.
+
+Nenhuma dessas pessoas vai ler o seu próximo e-mail.
+
+## Por que prejudicam a sua lista
+
+**Eles voltam depois.** No dia do cadastro, o endereço funciona. Uma semana depois, a caixa não existe mais, e a sua série de boas-vindas, os recibos e as novidades voltam como bounce. Bounces dizem ao Gmail e ao Outlook que você não limpa a sua lista, e isso leva o seu e-mail para o spam, também para os seus clientes reais.
+
+**Eles deixam os seus números errados.** Cada e-mail descartável é um "usuário" que nunca volta. Os cadastros sobem, mas as aberturas, a ativação e a conversão caem. Você decide com dados que não são verdadeiros.
+
+**Eles deixam abusar do seu plano grátis.** Uma pessoa com dez caixas temporárias são dez testes e dez cupons.
+
+**Eles custam dinheiro.** Você paga para enviar cada e-mail, também o e-mail que ninguém vai ler.
+
+## Como barrar
+
+O melhor momento é o formulário de cadastro, enquanto a pessoa ainda está ali. Peça um endereço real, e diga por quê: "Use um e-mail que você lê. Enviamos os seus códigos e recibos para ele."
+
+O [`POST /validate`](/docs/api/validate) dá `disposable: true` para uma caixa temporária, com o veredito `risky` e o motivo `disposable` (nota 0.2). Ele não envia nada:
+
+```ts
+const v = await mail.validate(email)
+
+if (v.disposable) {
+  return { error: "Use um e-mail que você lê, não um temporário." }
+}
+```
+
+Uma validação custa 100 créditos, um décimo de um e-mail.
+
+## O que o 1billion faz
+
+O 1billion mantém uma lista com milhares de domínios de e-mail temporário. Uma vez por dia, uma rotina adiciona os domínios novos de uma lista mantida pela comunidade. Um subdomínio de um domínio da lista também conta.
+
+Você não precisa chamar o `/validate` para estar seguro em cada envio. O `POST /send` confere cada destinatário **sem custo**, e um e-mail descartável recebe `422` com `check` e `address`. Nada é enviado, e nada é cobrado. Use o `/validate` no formulário, para a pessoa corrigir o endereço antes que ele entre na sua base.
+
+## Comece agora
+
+Os primeiros 100 e-mails de cada dia são grátis, todos os dias: cada workspace recebe 100.000 créditos à meia-noite, sem cartão. [Entre no console](https://app.1billion.clowk.in), adicione o seu domínio e envie o seu primeiro e-mail em poucos minutos com o [guia rápido](/docs/getting-started).

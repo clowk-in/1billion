@@ -1,0 +1,57 @@
+---
+title: 'Disposable addresses: what they are, and why they hurt your list'
+description: A disposable address is a temporary inbox that lives for minutes or days. Why people and bots use them, what they do to your bounces and your numbers, and how 1billion finds them.
+date: '2026-11-21T13:00:00Z'
+author: Thadeu Esteves
+folder: concepts
+tags: [disposable, validation, deliverability, sign-up]
+cover: /blog/disposable-addresses/cover.png
+---
+
+A **disposable address** is a temporary inbox. A person opens a site of temporary e-mail, gets an address such as `x7k2@some-temp-mail.com`, uses it on your sign-up form, reads the code, and leaves. After some minutes or days, the inbox is gone.
+
+There are thousands of these domains, and new ones come every day.
+
+## Why people use them
+
+- **To get past a wall.** Your product asks for an e-mail to show a trial, a download or a coupon. The person wants the thing, not your mail.
+- **To get the free plan again.** A new address gives a new account, a new trial, or a new coupon.
+- **Bots.** Sign-up bots and spam scripts use temporary inboxes because they cost nothing and leave no trail.
+
+None of these people will read your next mail.
+
+## Why they hurt your list
+
+**They bounce later.** On the day of the sign-up, the address works. A week later, the inbox is gone, and your welcome series, receipts and news bounce. Bounces tell Gmail and Outlook that you do not clean your list, and that moves your mail toward spam, also for your real customers.
+
+**They make your numbers wrong.** Each disposable address is a "user" who never comes back. Your sign-ups go up, but your opens, your activation and your conversion go down. You make decisions on data that is not true.
+
+**They let people abuse your free plan.** One person with ten temporary inboxes is ten trials and ten coupons.
+
+**They cost you money.** You pay to send each mail, also the mail that no one will ever read.
+
+## How to stop them
+
+The best moment is the sign-up form, while the person is still there. Ask for a real address, and say why: "Use an e-mail that you read. We send your codes and receipts there."
+
+[`POST /validate`](/docs/api/validate) gives `disposable: true` for a temporary inbox, with the verdict `risky` and the reason `disposable` (score 0.2). It sends nothing:
+
+```ts
+const v = await mail.validate(email)
+
+if (v.disposable) {
+  return { error: "Use an e-mail that you read, not a temporary one." }
+}
+```
+
+A validation costs 100 credits, one tenth of a mail.
+
+## What 1billion does
+
+1billion keeps a list of thousands of domains of temporary e-mail. Once a day, a job adds the new domains from a list that the community keeps. A subdomain of a listed domain also counts.
+
+You do not need to call `/validate` to be safe on each send. `POST /send` checks each recipient **for free**, and a disposable address gets `422` with `check` and `address`. Nothing is sent, and nothing is charged. Use `/validate` on the form, so the person can fix the address before it gets into your base.
+
+## Start now
+
+The first 100 mails of each day are free, every day: each workspace gets 100,000 credits at midnight, with no card. [Log in to the console](https://app.1billion.clowk.in), add your domain, and send your first mail in a few minutes with the [quickstart](/docs/getting-started).

@@ -1,0 +1,61 @@
+---
+title: 'IP compartilhado ou IP dedicado: e por que nunca fazemos o teste de RCPT TO'
+description: Todo e-mail sai de um IP, e os provedores guardam uma reputação para cada um. O que são um IP compartilhado e um IP dedicado, qual serve para o seu volume, e por que um teste de caixa com RCPT TO queima um IP compartilhado.
+date: '2026-11-21T14:00:00Z'
+author: Thadeu Esteves
+folder: concepts
+tags: [ip, reputation, deliverability, smtp, validation]
+cover: /blog/shared-vs-dedicated-ip/cover.png
+---
+
+Todo e-mail sai de um servidor com um endereço IP. Gmail, Outlook e os outros provedores guardam uma **reputação** para cada IP: quanto e-mail ele envia, quanto volta como bounce e quantas pessoas clicam em **Denunciar spam**. Com uma boa reputação, o seu e-mail vai para a caixa de entrada. Com uma ruim, vai para o spam, ou o servidor recusa.
+
+A reputação do seu **domínio** também conta (veja [SPF, DKIM e DMARC](/pt-br/blog/spf-dkim-dmarc)). Mas o IP é a primeira coisa que o servidor do destinatário vê.
+
+## Um IP compartilhado
+
+Num IP compartilhado, muitos remetentes enviam dos mesmos endereços. É o modelo comum de uma API de e-mail.
+
+- **O lado bom:** o IP já está aquecido. Ele envia e-mail todo dia, então os provedores o conhecem. Um remetente novo, com pouco volume, tem uma boa reputação no primeiro dia.
+- **O risco:** um remetente descuidado prejudica todos. Quem envia para uma lista antiga, com muitos bounces e reclamações, leva o IP para o spam para todos.
+
+Então o trabalho do serviço é **proteger o IP**: barrar o e-mail ruim antes que ele saia.
+
+## Um IP dedicado
+
+Um IP dedicado envia só o seu e-mail. A sua reputação é só sua.
+
+- **O lado bom:** nenhum outro remetente pode prejudicar você.
+- **O custo:** um IP novo não tem reputação. Você precisa **aquecê-lo**: começar com dezenas de e-mails por dia e aumentar devagar, ao longo de semanas. E ele precisa de volume: um IP que envia pouco, ou em horários aleatórios, nunca cria reputação.
+
+Um IP dedicado faz sentido para um volume grande e regular. Para um produto que envia códigos de cadastro, recibos e alertas, um IP compartilhado bem cuidado costuma ser a melhor escolha.
+
+## Por que nunca fazemos o teste de RCPT TO
+
+Muitos validadores de endereço fazem uma **checagem SMTP**: eles se conectam ao servidor do destinatário e começam um e-mail, mas nunca enviam:
+
+```text
+HELO validator.example
+MAIL FROM:<check@validator.example>
+RCPT TO:<joao@example.com>
+250 OK            ← "a caixa existe"
+QUIT
+```
+
+Num IP compartilhado, isso é uma má ideia:
+
+- **Parece um spammer.** Um spammer testa listas de endereços desse mesmo jeito, para achar os que existem. Muitas conexões abertas com `RCPT TO` e nenhum e-mail é um padrão conhecido, e os provedores bloqueiam.
+- **A resposta não é verdadeira.** Muitos servidores dizem `250 OK` para qualquer endereço (catch-all), e os grandes provedores costumam esconder a resposta, justamente para barrar esse spammer.
+- **Todos pagam.** Se o IP é bloqueado, o e-mail de todos os remetentes sofre, não só o de quem testou.
+
+Por isso o [`POST /validate`](/docs/api/validate) **nunca pergunta ao servidor do destinatário**. Ele usa só o que pode saber sem risco: a sintaxe, o DNS do domínio (MX), a lista de domínios descartáveis, e-mails de função, erros de digitação de provedores gratuitos, a lista de supressão, e o que o seu workspace viu do endereço nos últimos 30 dias.
+
+## Como o 1billion protege o IP
+
+- **Checagens antes de cada envio.** O `POST /send` recusa, sem custo, um destinatário com sintaxe errada, um domínio que não recebe e-mail, um domínio descartável ou um e-mail de função (`422`).
+- **A lista de supressão.** Um hard bounce coloca o endereço na [lista de supressão](/pt-br/blog/suppression-list) do app, e o 1billion não envia para ele de novo.
+- **Um endereço ruim custa mais.** Um e-mail para um endereço que não existe custa 2.000 créditos, o dobro de um e-mail bom. Um e-mail bloqueado pela nossa reputação (`5.7.x`) não custa nada: nós devolvemos. Veja [Créditos](/docs/guides/credits).
+
+## Comece agora
+
+Os primeiros 100 e-mails de cada dia são grátis, todos os dias: cada workspace recebe 100.000 créditos à meia-noite, sem cartão. [Entre no console](https://app.1billion.clowk.in), adicione o seu domínio e envie o seu primeiro e-mail em poucos minutos com o [guia rápido](/docs/getting-started).
