@@ -1,0 +1,50 @@
+---
+title: 1billion now receives your mail
+description: Point the MX of a domain to 1billion, and send each address to a mailbox or to your app. No other service, and no content kept.
+date: '2026-11-23T18:00:00Z'
+author: Thadeu Esteves
+folder: product
+tags: [receiving, forward, webhook, mx]
+cover: /blog/receive-mail/cover.png
+---
+
+Your app sends from `noreply@app.example.com`. A customer clicks Reply. Where does that mail go?
+
+For most apps, the answer is "nowhere", or "to one more service". The domain that sends has no inbox, so you add Cloudflare Email Routing, or a Google Workspace seat, only to get the replies and the mail to `feedback@`. One more account, one more set of DNS records, one more place to look when a mail is lost.
+
+From today, 1billion receives that mail too.
+
+## Why receive beside send
+
+The domain is already in 1billion. We verified it, we sign its mail, we know its reputation. To receive is one more record: an MX to us. Then the same console shows the mail that went out and the mail that came in, with the same 30 days of history.
+
+## How it works
+
+1. Turn on receiving in the tab **Recebimento** of a domain.
+2. Add 2 MX records: `mxa.clowk.dev` and `mxb.clowk.dev`.
+3. Write a route for each address:
+   - **Forward** `feedback@` to your mailbox. The mail goes as it came, so the DKIM of the sender stays valid, and SPF passes on our forwarding domain.
+   - **Webhook** `orders@` to your app. The event `mail.received` has the whole mail: the text, the HTML, the name of each attachment, and the SPF, DKIM and DMARC that our MX server saw. The Ruby, Go and JS SDKs give it its own type from 0.4.0.
+   - **Drop** what you do not want, with `*` as a catch-all.
+
+An address with no route gets `550`. We are never an open relay.
+
+## We keep no content
+
+A received mail lives only while it waits in our queue. We keep one row of data for 30 days: when it came, the address, the result, the checks. No subject, no body, no attachment. For a webhook, this means that the event is the only copy your app gets.
+
+## We protect the shared IP
+
+A forward goes out from the same IPs as the mail of every customer. So our MX server refuses spam and dangerous attachments before anything goes out: a sender with no reverse DNS, a failed DMARC with `p=reject`, a high spam score, programs, scripts, Office files with macros, and every archive. A forward goes only to a mailbox that its owner confirmed.
+
+## The price
+
+100,000,000 credits to turn it on for a domain, one time. 1,000 credits for each forward that goes out. A refused mail, or a mail dropped as spam, costs nothing.
+
+## Move from Cloudflare Email Routing
+
+1. In 1billion, turn on receiving and write the same routes that you have in Cloudflare.
+2. Confirm the mailboxes of your forwards in **Destinos**.
+3. In Cloudflare, turn off Email Routing for the domain, and replace its MX records with `mxa.clowk.dev` (10) and `mxb.clowk.dev` (20).
+
+The tab **Recebimento** says **Recebendo** when the MX points to us. The guide has every step: [Receive mail](/docs/guides/receiving).

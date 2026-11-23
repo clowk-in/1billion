@@ -1,0 +1,134 @@
+---
+title: Receive mail
+description: Point the MX of a domain to 1billion, and choose where the mail of each address goes, a mailbox or your app.
+---
+
+1billion can receive the mail of a domain that sends with it. You point the MX of the domain to us, and you write a route for each address: `feedback@` goes to your mailbox, `orders@` goes to your app by webhook, `*@` drops the rest. You do not need another service, such as Cloudflare Email Routing.
+
+We keep no content. A received mail lives only while it waits in our queue. We keep one row of data for 30 days: when it came, the address, the result, and the checks. You see these rows in the console, in **E-mails recebidos**.
+
+## Before you start
+
+- **Use a domain that has no inbox.** A domain has one MX. If your domain gets its mail from Google Workspace or Microsoft 365, and you point its MX to us, that mail stops. Use a subdomain with no inbox, such as `app.example.com`. See [Send from a subdomain](/docs/guides/subdomains).
+- **The domain sends with 1billion,** and it is verified in the console.
+- **You have the credits.** To turn on receiving costs 100,000,000 credits for each domain, one time, with no refund. Each forward that goes out costs 1,000 credits. A mail that we refuse, or drop as spam, costs nothing.
+
+## 1. Turn on receiving
+
+1. In the console, open **Domínios** and click the domain.
+2. Open the tab **Recebimento**.
+3. Click **Ligar o recebimento**. Type the name of the domain to confirm the charge.
+
+Turn it off and on again at any time: you pay only the first time. While receiving is off, our MX server refuses the mail of the domain.
+
+## 2. Publish the MX records
+
+Add the 2 records in the DNS of the domain:
+
+| Type | Name | Priority | Value |
+|---|---|---|---|
+| MX | `app.example.com` | 10 | `mxa.clowk.dev` |
+| MX | `app.example.com` | 20 | `mxb.clowk.dev` |
+
+On Cloudflare, the records are always "DNS only". An MX can not be proxied.
+
+The tab **Recebimento** says **Recebendo** when the MX points to us. Before that, it says **Aguardando o MX**. DNS changes can take some minutes.
+
+## 3. Write the routes
+
+Open **Recebimento → Rotas** and click **Nova rota**. A route has an address and an action:
+
+| Action | What happens |
+|---|---|
+| **Encaminhar** | The mail goes to a mailbox, as it came. |
+| **Webhook** | The mail goes to the webhook of the app, as the event `mail.received`. |
+| **Descartar** | The mail is accepted and dropped. |
+
+- The address is a name (`feedback`) or `*`, the catch-all. A name wins over `*`.
+- A `+tag` is ignored: `feedback+beta@` uses the route of `feedback@`.
+- An address with no route, and no `*`, gets `550`. We are never an open relay.
+- A switch turns a route off with no delete.
+
+### Forward to a mailbox
+
+A forward goes only to a mailbox that you confirmed, or to a member of the workspace. Add the mailbox in **Recebimento → Destinos**: we send it a link, and the owner of the mailbox clicks it.
+
+The forward keeps the mail as it came, so the DKIM of the sender stays valid. We change the envelope sender (SRS, on `srs.clowk.dev`), so SPF passes, and we add 2 headers on top:
+
+```
+X-Forwarded-By: 1billion.clowk.in
+X-Forwarded-For: feedback@app.example.com you@gmail.com
+```
+
+### Send to your app (webhook)
+
+The app of the domain needs a webhook (**Webhooks** in the console), with the event `mail.received` on. If the webhook is off, or the event is off, the mail is dropped, and **E-mails recebidos** says why.
+
+The event has the whole mail in `data`: `from`, `subject`, `text`, `html`, the name, type and size of each attachment, and the checks of our MX server. `text` and `html` are never cut. This is the only time your app gets the mail: we keep no content.
+
+```json
+{
+  "id": "7d0b5e2a9c41",
+  "type": "mail.received",
+  "message_id": "",
+  "to": "feedback@app.example.com",
+  "detail": "",
+  "created_at": "2026-11-19T12:00:01Z",
+  "data": {
+    "id": "01a200b1-4304-7844-80e1-5c2d7a9e3f10",
+    "from": "Ana <ana@example.org>",
+    "to": "feedback@app.example.com",
+    "mail_from": "ana@example.org",
+    "subject": "Olá",
+    "message_id": "<abc@example.org>",
+    "text": "Oi, tudo bem?",
+    "html": "<p>Oi, tudo bem?</p>",
+    "attachments": [{ "filename": "nota.pdf", "content_type": "application/pdf", "size": 48213 }],
+    "auth": { "spf": "pass", "dkim": "pass", "dmarc": "pass" },
+    "size": 52011,
+    "received_at": "2026-11-19T12:00:00.000Z"
+  }
+}
+```
+
+The SDKs (0.4.0 or newer) check the signature and give the event its own type:
+
+```ruby
+event = OneBillion::Signature.verify(payload: request.raw_post, headers: request.headers)
+
+if event["type"] == OneBillion::Signature::MAIL_RECEIVED
+  mail = event["data"]
+end
+```
+
+```go
+event, err := onebillion.VerifySignature(payload, r.Header, "")
+
+if err == nil && event.Type == onebillion.EventMailReceived {
+	mail := event.Data
+}
+```
+
+```ts
+const event = verifySignature({ payload: await request.text(), headers: request.headers })
+
+if (event.type === "mail.received") {
+  const mail = event.data
+}
+```
+
+## What we refuse
+
+To keep the shared sending IP clean, our MX server refuses some mail at the edge. Nothing is kept, and nothing goes out:
+
+- a sender IP with no reverse DNS that points back to it;
+- a mail whose DMARC failed and whose domain says `p=reject`;
+- spam, by our score (a score of 10 or more);
+- a dangerous attachment: programs, scripts, disk images, Office files with macros, and every archive (`.zip`, `.rar`, `.7z` and the others);
+- a mail over 25 MB.
+
+Each refused mail of an address with a route shows in **E-mails recebidos**, with the reason.
+
+## See what came
+
+**Recebimento → E-mails recebidos** lists each mail of 30 days: the sender, the address, the result (Encaminhado, Webhook, Descartado, Recusado, Spam) and the reason. Click a row to see the journey of the mail, its checks and its attachments.
