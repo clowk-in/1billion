@@ -1,0 +1,50 @@
+---
+title: O 1billion agora recebe o seu e-mail
+description: Aponte o MX de um domínio para o 1billion e mande cada endereço para uma caixa ou para o seu app. Sem outro serviço, e sem guardar o conteúdo.
+date: '2026-11-23T18:00:00Z'
+author: Thadeu Esteves
+folder: product
+tags: [receiving, forward, webhook, mx]
+cover: /blog/receive-mail/cover.png
+---
+
+O seu app envia de `noreply@app.example.com`. Um cliente clica em Responder. Para onde vai esse e-mail?
+
+Na maioria dos apps, a resposta é "para lugar nenhum" ou "para mais um serviço". O domínio que envia não tem caixa de entrada, então você põe o Cloudflare Email Routing, ou uma conta do Google Workspace, só para pegar as respostas e o e-mail de `feedback@`. Mais uma conta, mais registros de DNS, mais um lugar para olhar quando um e-mail some.
+
+A partir de hoje, o 1billion também recebe esse e-mail.
+
+## Por que receber junto com o envio
+
+O domínio já está no 1billion. Nós verificamos, assinamos o e-mail dele e conhecemos a reputação dele. Para receber, falta só um registro: um MX para nós. Aí o mesmo console mostra o e-mail que saiu e o que chegou, com os mesmos 30 dias de histórico.
+
+## Como funciona
+
+1. Ligue o recebimento na aba **Recebimento** de um domínio.
+2. Publique 2 registros MX: `mxa.clowk.dev` e `mxb.clowk.dev`.
+3. Crie uma rota para cada endereço:
+   - **Encaminhar** `feedback@` para a sua caixa. O e-mail vai como chegou, então o DKIM do remetente continua válido, e o SPF passa no nosso domínio de encaminhamento.
+   - **Webhook** `pedidos@` para o seu app. O evento `mail.received` traz o e-mail inteiro: o texto, o HTML, o nome de cada anexo, e o SPF, o DKIM e o DMARC que o nosso servidor MX viu. Os SDKs de Ruby, Go e JS dão a ele um tipo próprio a partir da 0.4.0.
+   - **Descartar** o que você não quer, com `*` para pegar todos os outros.
+
+Um endereço sem rota recebe `550`. Nunca somos um relay aberto.
+
+## Não guardamos o conteúdo
+
+Um e-mail recebido existe só enquanto espera na nossa fila. Guardamos uma linha de dados por 30 dias: quando chegou, o endereço, o resultado e as verificações. Sem assunto, sem corpo, sem anexo. Num webhook, isso quer dizer que o evento é a única cópia que o seu app recebe.
+
+## Protegemos o IP compartilhado
+
+Um encaminhamento sai dos mesmos IPs que o e-mail de todos os clientes. Por isso, o nosso servidor MX recusa spam e anexos perigosos antes que algo saia: remetente sem DNS reverso, DMARC que falhou com `p=reject`, pontuação de spam alta, programas, scripts, arquivos do Office com macros e todo arquivo compactado. Um encaminhamento só vai para uma caixa que o dono confirmou.
+
+## O preço
+
+100.000.000 de créditos para ligar o recebimento num domínio, uma vez. 1.000 créditos por encaminhamento que sai. Um e-mail recusado, ou descartado como spam, não custa nada.
+
+## Saia do Cloudflare Email Routing
+
+1. No 1billion, ligue o recebimento e crie as mesmas rotas que você tem na Cloudflare.
+2. Confirme as caixas dos seus encaminhamentos em **Destinos**.
+3. Na Cloudflare, desligue o Email Routing do domínio e troque os registros MX por `mxa.clowk.dev` (10) e `mxb.clowk.dev` (20).
+
+A aba **Recebimento** mostra **Recebendo** quando o MX aponta para nós. O guia tem todos os passos: [Receive mail](/docs/guides/receiving).
